@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SessionForge Browser</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+  <!-- ───── Sidebar: named identities (sessions) ───── -->
+  <aside id="sidebar">
+    <header class="brand">
+      <div class="logo">SF</div>
+      <div class="brand-text">
+        <h1>SessionForge</h1>
+        <p>One browser, many logins</p>
+      </div>
+    </header>
+
+    <button id="newSessionBtn" class="btn-primary"
+            title="Create a new identity">
+      <span class="full">+ New Identity</span>
+      <span class="mini">+</span>
+    </button>
+
+    <ul id="sessionList"></ul>
+
+    <footer class="hint">
+      Click an identity to switch to its tabs. Each identity has its own
+      cookies — log in to the same site as different users in parallel.
+    </footer>
+  </aside>
+
+  <!-- ───── Main: tabs + URL bar + webview host ───── -->
+  <main id="main">
+
+    <!-- Tab strip -->
+    <div id="tabStrip">
+      <div id="tabs"></div>
+      <button id="newTabBtn" title="New tab in current identity">+</button>
+    </div>
+
+    <!-- URL bar -->
+    <div id="urlBar">
+      <button id="backBtn"    title="Back">‹</button>
+      <button id="fwdBtn"     title="Forward">›</button>
+      <button id="reloadBtn"  title="Reload">↻</button>
+      <span id="sessionChip" class="chip"></span>
+      <input id="urlInput" type="text" placeholder="Enter URL or search" spellcheck="false">
+      <button id="cloneBtn" title="Open this URL in a new identity">⎘ Clone</button>
+    </div>
+
+    <!-- Webview host: one <webview> per tab, only the active one is shown.
+         The empty-state placeholder lives *inside* viewHost so it covers
+         only the page area, leaving the URL bar reachable. -->
+    <div id="viewHost">
+      <div id="emptyState" class="empty">
+        <h2>No tabs open</h2>
+        <p>Type a URL above, or pick an identity on the left.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Sidebar collapse / expand toggle. Sibling of #app so its position is
+     driven by #app's class. Floats on the seam between the two columns. -->
+<button id="sidebarToggle" title="Toggle sidebar (⌘B)">‹</button>
+
+<!-- Identity-creation modal -->
+<dialog id="newSessionModal">
+  <form method="dialog" id="newSessionForm">
+    <h3>New Identity</h3>
+    <p class="hint">Cookies and storage will be isolated from your other identities.</p>
+    <label>Name</label>
+    <input id="newSessionName" autofocus required placeholder="e.g. Claude · Work">
+    <label>Color</label>
+    <input id="newSessionColor" type="color" value="#6ea8ff">
+    <menu>
+      <button value="cancel">Cancel</button>
+      <button id="createSessionBtn" value="ok">Create</button>
+    </menu>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>

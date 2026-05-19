@@ -1,0 +1,16 @@
+{
+  "name": "sessionforge-browser",
+  "version": "0.1.0",
+  "description": "A custom browser where every tab can be its own login session — log in to the same site as multiple users simultaneously.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev":   "electron . --enable-logging"
+  },
+  "keywords": ["browser", "electron", "multi-session", "multi-account"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

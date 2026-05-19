@@ -1,0 +1,13 @@
+// SessionForge Browser — preload bridge.
+//
+// Runs in an isolated context with access to Node + Electron's ipcRenderer.
+// Exposes a tiny `window.api` surface to the renderer so the rest of the UI
+// can stay sandboxed.
+
+const { contextBridge, ipcRenderer } = require("electron");
+
+contextBridge.exposeInMainWorld("api", {
+  listSessions:  ()           => ipcRenderer.invoke("sessions:list"),
+  saveSessions:  (sessions)   => ipcRenderer.invoke("sessions:save", sessions),
+  clearSession:  (id)         => ipcRenderer.invoke("sessions:clear", id),
+});
