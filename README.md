@@ -5,6 +5,10 @@ multiple different users at the same time**. Built on Electron, so every tab
 runs in a real Chromium engine — but each tab's cookies, localStorage, and
 IndexedDB live in their own isolated bucket.
 
+See [**`useCases.md`**](./useCases.md) for 25 real-world situations this
+solves — agency social-media management, role-matrix QA, family devices,
+journalism source compartmentalization, and more.
+
 ## Download
 
 Grab the latest installer for your platform:
