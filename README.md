@@ -92,6 +92,15 @@ renderer/
 Renderer is sandboxed: `contextIsolation: true`, `nodeIntegration: false`.
 The only Node-side surface it gets is `window.api` from `preload.js`.
 
+## Coming next: identity automation
+
+A future release will let you drive any identity programmatically — open
+a URL, find a specific text box on the page, and type a message — all
+scoped to one identity's session. Send the same prompt to three Claude
+accounts at once, dispatch a templated message to ten support tickets,
+or run a scripted login sequence on first launch of a new identity.
+Tracked below.
+
 ## Roadmap
 
 | Feature                                                       | Status |
@@ -106,7 +115,8 @@ The only Node-side surface it gets is `window.api` from `preload.js`.
 | Identity groups ("Work" / "Personal" containers)              | ⏳     |
 | Drag-tab-onto-identity to rebind                              | ⏳     |
 | Export / import an identity (cookie bundle)                   | ⏳     |
-| Build to `.dmg` / `.exe` via electron-builder                 | ⏳     |
+| Build to `.dmg` / `.exe` via electron-builder                 | ✅     |
+| **Automation: scripted navigation + text input into target fields** | ⏳     |
 
 ## License
 
