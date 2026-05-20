@@ -11,9 +11,9 @@ IndexedDB live in their own isolated bucket.
 │  • Default                    │  identity)                  │
 │  • Claude · Work     ●blue    │  ┌─ [Work] claude.ai ──┐    │
 │  • Claude · Personal ●pink    │  ┌─ [Pers] claude.ai ──┐    │
-│  • ChatGPT · Acct 1  ●green   │  ┌─ [Acct1] chatgpt..─┐    │
+│  • ChatGPT · Acct 1  ●green   │  ┌─ [Acct1] chatgpt..─┐     │
 │                               │                             │
-│  + New Identity               │  URL bar | Clone | … site …│
+│  + New Identity               │  URL bar | Clone | … site … │
 └─────────────────────────────────────────────────────────────┘
 ```
 
