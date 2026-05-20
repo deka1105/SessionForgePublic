@@ -1,0 +1,75 @@
+# Builds SessionForge for macOS, Windows, and Linux when a `v*` tag is pushed
+# (or when manually dispatched), and attaches the installers to a GitHub Release.
+#
+# Tag → release flow:
+#   git tag v0.1.1 && git push origin v0.1.1
+#
+# Artifacts produced:
+#   macOS:   SessionForge-<version>-{x64,arm64}.dmg + .zip
+#   Windows: SessionForge Setup <version>.exe (NSIS)
+#   Linux:   SessionForge-<version>.AppImage
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write      # needed by softprops/action-gh-release to create the release
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # electron-builder reads `build` from package.json. Skipping code-signing
+      # here — distributing unsigned binaries. Users will see Gatekeeper /
+      # SmartScreen warnings on first launch.
+      - name: Build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npx electron-builder --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sessionforge-${{ matrix.os }}
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+            dist/*.AppImage
+          if-no-files-found: ignore
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
