@@ -5,6 +5,18 @@ multiple different users at the same time**. Built on Electron, so every tab
 runs in a real Chromium engine — but each tab's cookies, localStorage, and
 IndexedDB live in their own isolated bucket.
 
+## Download
+
+Grab the latest installer for your platform:
+
+- **macOS** — [SessionForge-0.1.0.dmg](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-0.1.0.dmg) *(Intel)* · [SessionForge-0.1.0-arm64.dmg](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-0.1.0-arm64.dmg) *(Apple Silicon)*
+- **Windows** — [SessionForge.Setup.0.1.0.exe](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge.Setup.0.1.0.exe)
+- **Linux** — [SessionForge-0.1.0.AppImage](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-0.1.0.AppImage)
+
+Builds are unsigned, so on first launch macOS Gatekeeper / Windows
+SmartScreen will warn — right-click → Open (mac) or "More info → Run
+anyway" (win). All releases: <https://github.com/deka1105/SessionForgePublic/releases>
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Sidebar — identities         │  Tabs (each bound to one    │
