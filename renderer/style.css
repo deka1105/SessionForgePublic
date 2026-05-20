@@ -81,9 +81,8 @@ button, input { font-family: inherit; font-size: inherit; color: inherit; }
 .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
 .logo {
   width: 32px; height: 32px; border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #fff; font-weight: 700;
-  display: grid; place-items: center;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 .brand h1 { margin: 0; font-size: 14px; font-weight: 600; }
 .brand p  { margin: 0; font-size: 11px; color: var(--muted); }

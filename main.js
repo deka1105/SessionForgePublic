@@ -14,6 +14,14 @@ const { app, BrowserWindow, ipcMain, session } = require("electron");
 const path = require("node:path");
 const fs   = require("node:fs");
 
+// Make the dock tooltip and menu show "SessionForge" instead of "Electron".
+// Must be called before app is ready.
+app.setName("SessionForge");
+// setName() also changes userData to ~/Library/Application Support/SessionForge.
+// Pin it back to the original path so existing identities + partitions survive
+// the rename.
+app.setPath("userData", path.join(app.getPath("appData"), "sessionforge-browser"));
+
 // ─── Persistence ──────────────────────────────────────────────────────────
 // We store only the *metadata* of sessions (id, name, colour). The actual
 // cookies/storage live inside Electron's per-partition cache directory and
@@ -46,6 +54,7 @@ function createWindow() {
     height: 800,
     titleBarStyle: "hiddenInset",
     backgroundColor: "#0f1115",
+    icon: path.join(__dirname, "assets", "icon.png"),
     webPreferences: {
       preload:          path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -82,7 +91,13 @@ ipcMain.handle("sessions:clear", async (_e, id) => {
 });
 
 // ─── App lifecycle ────────────────────────────────────────────────────────
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  // Replace the Electron-default dock icon with ours (macOS only).
+  if (process.platform === "darwin" && app.dock) {
+    app.dock.setIcon(path.join(__dirname, "assets", "icon.png"));
+  }
+  createWindow();
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
