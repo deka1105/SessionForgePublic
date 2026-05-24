@@ -67,10 +67,12 @@
      driven by #app's class. Floats on the seam between the two columns. -->
 <button id="sidebarToggle" title="Toggle sidebar (⌘B)">‹</button>
 
-<!-- Identity-creation modal -->
+<!-- Identity create / edit modal. Title + submit-button label are swapped
+     in JS depending on whether we're creating a new identity or editing
+     an existing one. -->
 <dialog id="newSessionModal">
   <form method="dialog" id="newSessionForm">
-    <h3>New Identity</h3>
+    <h3 id="sessionModalTitle">New Identity</h3>
     <p class="hint">Cookies and storage will be isolated from your other identities.</p>
     <label>Name</label>
     <input id="newSessionName" autofocus required placeholder="e.g. Claude · Work">

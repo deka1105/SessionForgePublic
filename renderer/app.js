@@ -25,6 +25,7 @@ const state = {
   tabs:            [],   // [{id, sessionId, url, title, webview}]
   activeTab:       null, // tab id
   lastTabPerSess:  {},   // sessionId → most-recently-activated tab id
+  editingSessionId: null, // when the identity modal is open in "edit" mode
 };
 
 const DEFAULT_HOME = "https://duckduckgo.com";
@@ -112,6 +113,8 @@ function renderSidebar() {
     const li = el("li", { className: "sess-item", title: `Switch to "${s.name}"` },
       dot,
       el("span", { className: "sess-name", textContent: s.name }),
+      el("button", { className: "sess-edit", title: "Rename or recolour identity", textContent: "✎",
+                     onclick: e => { e.stopPropagation(); openSessionModal({ editingId: s.id }); } }),
       el("button", { className: "sess-x", title: "Delete identity (wipes cookies)", textContent: "×",
                      onclick: e => { e.stopPropagation(); deleteSession(s.id); } }),
     );
@@ -272,12 +275,39 @@ function normalizeUrl(input) {
   return "https://duckduckgo.com/?q=" + encodeURIComponent(v);        // fall through to search
 }
 
-// ── identity modal ───────────────────────────────────────────────────────
-$("newSessionBtn").onclick = () => {
-  $("newSessionName").value  = "";
-  $("newSessionColor").value = randomColor();
+// ── identity modal (create + edit) ───────────────────────────────────────
+// One dialog serves both flows. `editingId` toggles between them: when set,
+// the modal pre-fills with that identity's name/color and "Create" becomes
+// "Save". `state.editingSessionId` is the source of truth the submit handler
+// consults to decide which branch to take.
+function openSessionModal({ editingId = null } = {}) {
+  state.editingSessionId = editingId;
+  const s = editingId ? state.sessions.find(s => s.id === editingId) : null;
+
+  $("sessionModalTitle").textContent = s ? "Edit Identity" : "New Identity";
+  $("createSessionBtn").textContent  = s ? "Save"          : "Create";
+  $("newSessionName").value          = s?.name  ?? "";
+  $("newSessionColor").value         = s?.color ?? randomColor();
   $("newSessionModal").showModal();
-};
+}
+
+async function updateSession(id, name, color) {
+  const s = state.sessions.find(s => s.id === id);
+  if (!s) return;
+  s.name  = name;
+  s.color = color;
+  await persistSessions();
+  renderSidebar();
+  renderTabs();                                  // tab dots use s.color
+  if (state.activeTab) activateTab(state.activeTab);  // refresh chip
+}
+
+$("newSessionBtn").onclick = () => openSessionModal();
+
+// Clear edit mode whenever the dialog closes (cancel, ESC, or submit).
+$("newSessionModal").addEventListener("close", () => {
+  state.editingSessionId = null;
+});
 
 $("newSessionForm").addEventListener("submit", async (e) => {
   // dialog form auto-closes; we only act on the "ok" path.
@@ -286,8 +316,13 @@ $("newSessionForm").addEventListener("submit", async (e) => {
   const name  = $("newSessionName").value.trim();
   const color = $("newSessionColor").value;
   if (!name) return;
-  const id = await createSession(name, color);
-  openTab(id);
+
+  if (state.editingSessionId) {
+    await updateSession(state.editingSessionId, name, color);
+  } else {
+    const id = await createSession(name, color);
+    openTab(id);
+  }
 });
 
 function randomColor() {

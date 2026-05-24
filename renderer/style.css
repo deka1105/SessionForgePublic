@@ -38,6 +38,7 @@ button, input { font-family: inherit; font-size: inherit; color: inherit; }
 #app.sidebar-collapsed .brand              { display: none; }
 #app.sidebar-collapsed .hint               { display: none; }
 #app.sidebar-collapsed .sess-name,
+#app.sidebar-collapsed .sess-edit,
 #app.sidebar-collapsed .sess-x,
 #app.sidebar-collapsed .btn-primary .full  { display: none; }
 #app.sidebar-collapsed .btn-primary .mini  { display: grid; place-items: center; font-size: 20px; line-height: 1; }
@@ -109,13 +110,17 @@ button, input { font-family: inherit; font-size: inherit; color: inherit; }
    collapsed icon-rail enlarges the swatch enough for it to be visible. */
 .sess-favicon { display: none; }
 .sess-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sess-x {
+.sess-edit, .sess-x {
   background: transparent; border: none; color: var(--muted);
-  cursor: pointer; padding: 0 4px; font-size: 16px;
-  opacity: 0; transition: opacity .15s;
+  cursor: pointer; padding: 0 4px;
+  opacity: 0; transition: opacity .15s, color .15s;
 }
-.sess-item:hover .sess-x { opacity: 1; }
-.sess-x:hover { color: var(--danger); }
+.sess-edit { font-size: 12px; }
+.sess-x    { font-size: 16px; }
+.sess-item:hover .sess-edit,
+.sess-item:hover .sess-x    { opacity: 1; }
+.sess-edit:hover { color: var(--text); }
+.sess-x:hover    { color: var(--danger); }
 
 .hint { color: var(--muted); font-size: 11px; margin-top: auto; padding-top: 14px; }
 

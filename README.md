@@ -66,7 +66,7 @@ more, then click any identity to open a tab as that user.
 
 ## What's in the box (MVP)
 
-- ✅ Sidebar with named identities (create / delete, with cookie wipe)
+- ✅ Sidebar with named identities (create / rename / recolour / delete, with cookie wipe)
 - ✅ Tab strip — each tab shows a coloured dot for its identity
 - ✅ URL bar — type a URL or a search query
 - ✅ Back / Forward / Reload
