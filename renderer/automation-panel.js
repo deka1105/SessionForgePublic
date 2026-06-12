@@ -106,8 +106,8 @@ const automationPanel = (() => {
     const btn = panelEl.querySelector(".auto-record");
     if (automation.isRecording()) {
       btn.textContent = "⏳ Saving…";
+      document.body.classList.remove("is-recording");
       const steps = automation.stopRecording();
-      // Wait a moment for the flush to capture last typed text
       await new Promise(r => setTimeout(r, 500));
       currentSteps.push(...steps);
       renderSteps();
@@ -120,6 +120,7 @@ const automationPanel = (() => {
       });
       btn.textContent = "⏹ Stop";
       btn.classList.add("recording");
+      document.body.classList.add("is-recording");
       log("Recording… interact with the page, then press Stop", "info");
     }
   }
@@ -143,6 +144,7 @@ const automationPanel = (() => {
       const def = ACTION_DEFS.find(a => a.action === step.action);
       const stepEl = document.createElement("div");
       stepEl.className = "auto-step";
+      stepEl.dataset.action = step.action;
 
       let summary = "";
       if (step.action === "click") summary = `(${step.params.x}, ${step.params.y})`;
@@ -322,25 +324,58 @@ const automationPanel = (() => {
     log("Done!", "success");
   }
 
-  // ── Save / Load ───────────────────────────────────────────────────────
+  // ── Save / Load / Gallery ──────────────────────────────────────────────
   async function save() {
-    const name = await showPrompt("Save script as:", "my-automation");
-    if (!name) return;
-    const filename = await window.api.saveScript(name, currentSteps);
-    log(`Saved: ${filename}`, "success");
+    if (!currentSteps.length) { log("No steps to save", "warn"); return; }
+    // Show a save form with metadata fields
+    const overlay = document.createElement("div");
+    overlay.className = "auto-prompt-overlay";
+    overlay.innerHTML = `
+      <div class="auto-prompt-box" style="width:380px;">
+        <div class="auto-prompt-title">Save Script</div>
+        <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:4px;">Name</label>
+        <input class="auto-prompt-input" id="save-name" placeholder="My Automation" autofocus>
+        <label style="display:block;font-size:11px;color:var(--muted);margin:10px 0 4px;">Website</label>
+        <input class="auto-prompt-input" id="save-website" placeholder="e.g. chatgpt.com, claude.ai">
+        <label style="display:block;font-size:11px;color:var(--muted);margin:10px 0 4px;">Description</label>
+        <textarea class="auto-prompt-input" id="save-desc" rows="2" style="resize:vertical;" placeholder="What does this script do?"></textarea>
+        <div class="auto-prompt-actions">
+          <button class="auto-prompt-cancel">Cancel</button>
+          <button class="auto-prompt-ok">Save</button>
+        </div>
+      </div>
+    `;
+    document.body.append(overlay);
+
+    const nameInput = overlay.querySelector("#save-name");
+    setTimeout(() => nameInput.focus(), 50);
+
+    await new Promise((resolve) => {
+      overlay.querySelector(".auto-prompt-ok").onclick = async () => {
+        const name = nameInput.value.trim();
+        if (!name) { nameInput.style.borderColor = "var(--danger)"; return; }
+        const website = overlay.querySelector("#save-website").value.trim();
+        const description = overlay.querySelector("#save-desc").value.trim();
+        const filename = await window.api.saveScript({ name, website, description, steps: currentSteps });
+        overlay.remove();
+        log(`Saved: ${name}`, "success");
+        resolve();
+      };
+      overlay.querySelector(".auto-prompt-cancel").onclick = () => { overlay.remove(); resolve(); };
+      nameInput.addEventListener("keydown", (e) => { if (e.key === "Escape") { overlay.remove(); resolve(); } });
+    });
   }
 
-  async function load() {
-    const scripts = await window.api.listScripts();
-    if (!scripts.length) { log("No saved scripts", "warn"); return; }
-    const names = scripts.map((s, i) => `${i + 1}. ${s.name}`).join(", ");
-    const pick = await showPrompt(`Load script (${names}):`, "Enter number");
-    if (!pick) return;
-    const idx = parseInt(pick, 10) - 1;
-    if (idx < 0 || idx >= scripts.length) { log("Invalid", "warn"); return; }
-    currentSteps = scripts[idx].steps;
+  function load() {
+    // Open the script gallery
+    scriptGallery.toggle(true);
+  }
+
+  // Called by the gallery when user clicks "Use" on a script
+  function loadSteps(steps, name) {
+    currentSteps = JSON.parse(JSON.stringify(steps));
     renderSteps();
-    log(`Loaded: ${scripts[idx].name}`, "info");
+    log(`Loaded: ${name}`, "info");
   }
 
   // ── Log ───────────────────────────────────────────────────────────────
@@ -354,5 +389,5 @@ const automationPanel = (() => {
     logEl.scrollTop = logEl.scrollHeight;
   }
 
-  return { toggle, create };
+  return { toggle, create, loadSteps };
 })();

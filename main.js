@@ -144,16 +144,28 @@ ipcMain.handle("automation:list-scripts", () => {
   const dir = automationsDir();
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir).filter(f => f.endsWith(".json")).map(f => {
-    const raw = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
-    return { filename: f, ...raw };
-  });
+    try {
+      const raw = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
+      return { filename: f, ...raw };
+    } catch { return null; }
+  }).filter(Boolean);
 });
 
-ipcMain.handle("automation:save-script", (_e, name, steps) => {
+ipcMain.handle("automation:save-script", (_e, scriptData) => {
   const dir = automationsDir();
   fs.mkdirSync(dir, { recursive: true });
-  const filename = name.replace(/[^a-z0-9_-]/gi, "_") + ".json";
-  fs.writeFileSync(path.join(dir, filename), JSON.stringify({ name, steps }, null, 2));
+  const now = new Date().toISOString();
+  const data = {
+    name: scriptData.name || "Untitled",
+    description: scriptData.description || "",
+    website: scriptData.website || "",
+    created: scriptData.created || now,
+    modified: now,
+    steps: scriptData.steps || [],
+  };
+  const filename = (scriptData.filename) ||
+    (data.name.replace(/[^a-z0-9_-]/gi, "_") + ".json");
+  fs.writeFileSync(path.join(dir, filename), JSON.stringify(data, null, 2));
   return filename;
 });
 
