@@ -67,6 +67,7 @@ const automationPanel = (() => {
         <button class="auto-btn auto-save" title="Save script">💾 Save</button>
         <button class="auto-btn auto-load" title="Load script">📂 Load</button>
         <button class="auto-btn auto-schedule" title="Schedule this script">⏰</button>
+        <button class="auto-btn auto-multi" title="Run scripts on multiple identities">⚡ Multi</button>
       </div>
       <div class="auto-steps"></div>
       <div class="auto-add-step">
@@ -90,6 +91,7 @@ const automationPanel = (() => {
     panelEl.querySelector(".auto-save").onclick = save;
     panelEl.querySelector(".auto-load").onclick = load;
     panelEl.querySelector(".auto-schedule").onclick = schedulePrompt;
+    panelEl.querySelector(".auto-multi").onclick = openMultiRun;
     panelEl.querySelector(".auto-add-btn").onclick = addStep;
     panelEl.querySelector(".auto-clear-btn").onclick = () => { currentSteps = []; renderSteps(); };
     panelEl.querySelector(".auto-schedule-cancel").onclick = cancelSchedule;
@@ -387,6 +389,72 @@ const automationPanel = (() => {
     line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
     logEl.append(line);
     logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  // ── Multi-Run: assign scripts to identities, run in parallel ────────
+  async function openMultiRun() {
+    const scripts = await window.api.listScripts();
+    if (!scripts.length) { log("Save some scripts first", "warn"); return; }
+
+    const overlay = document.createElement("div");
+    overlay.className = "auto-prompt-overlay";
+
+    const identityRows = state.sessions.map(s => {
+      const options = scripts.map(sc => `<option value="${sc.filename}">${sc.name}</option>`).join("");
+      return `
+        <div class="multi-row">
+          <span class="multi-dot" style="background:${s.color}"></span>
+          <span class="multi-name">${s.name}</span>
+          <select class="multi-select" data-session="${s.id}">
+            <option value="">— skip —</option>
+            ${options}
+          </select>
+        </div>
+      `;
+    }).join("");
+
+    overlay.innerHTML = `
+      <div class="auto-prompt-box" style="width:400px;">
+        <div class="auto-prompt-title">Multi-Run: Assign Scripts to Identities</div>
+        <div class="multi-list">${identityRows}</div>
+        <div class="auto-prompt-actions">
+          <button class="auto-prompt-cancel">Cancel</button>
+          <button class="auto-prompt-ok">Run All</button>
+        </div>
+      </div>
+    `;
+    document.body.append(overlay);
+
+    await new Promise((resolve) => {
+      overlay.querySelector(".auto-prompt-cancel").onclick = () => { overlay.remove(); resolve(); };
+      overlay.querySelector(".auto-prompt-ok").onclick = async () => {
+        const selects = overlay.querySelectorAll(".multi-select");
+        const assignments = [];
+        for (const sel of selects) {
+          if (!sel.value) continue;
+          const sessionId = sel.dataset.session;
+          const script = scripts.find(s => s.filename === sel.value);
+          if (script?.steps) assignments.push({ sessionId, steps: script.steps, scriptName: script.name });
+        }
+        overlay.remove();
+
+        if (!assignments.length) { log("No assignments selected", "warn"); resolve(); return; }
+
+        log(`Multi-Run: ${assignments.length} identities…`, "info");
+        const results = await automation.runMulti(assignments, (sessionId, scriptName, i, step, status, err) => {
+          const identity = state.sessions.find(s => s.id === sessionId);
+          if (status === "running") log(`[${identity?.name}] Step ${i+1}: ${step.action}…`);
+          else if (status === "error") log(`[${identity?.name}] Step ${i+1} failed: ${err}`, "error");
+        });
+
+        for (const r of results) {
+          const identity = state.sessions.find(s => s.id === r.sessionId);
+          if (r.result === "done") log(`[${identity?.name}] ✓ ${r.scriptName} complete`, "success");
+          else log(`[${identity?.name}] ✗ ${r.scriptName}: ${r.error}`, "error");
+        }
+        resolve();
+      };
+    });
   }
 
   return { toggle, create, loadSteps };

@@ -320,5 +320,136 @@ const automation = (() => {
     }
   }
 
-  return { actions, runScript, startRecording, stopRecording, isRecording, getActiveWebview };
+  // ── Run on a specific webview (for multi-identity parallel runs) ──────
+  function makeActionsForWebview(wv) {
+    return {
+      async click(params) {
+        const x = Math.round(params.x || 0);
+        const y = Math.round(params.y || 0);
+        await wv.executeJavaScript(`
+          (() => {
+            const x = ${x}, y = ${y};
+            const el = document.elementFromPoint(x, y) || document.body;
+            const opts = { clientX: x, clientY: y, screenX: x, screenY: y, bubbles: true, cancelable: true, view: window };
+            el.dispatchEvent(new PointerEvent('pointerdown', opts));
+            el.dispatchEvent(new MouseEvent('mousedown', opts));
+            el.dispatchEvent(new PointerEvent('pointerup', opts));
+            el.dispatchEvent(new MouseEvent('mouseup', opts));
+            el.dispatchEvent(new MouseEvent('click', opts));
+            if (el.focus) el.focus();
+          })()
+        `);
+      },
+      async type(params) {
+        const text = params.text || "";
+        await wv.executeJavaScript(`
+          (() => {
+            const text = ${JSON.stringify(text)};
+            const el = document.activeElement;
+            if (!el) return;
+            if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+              const proto = el.tagName === 'INPUT' ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
+              const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+              const curVal = el.value || '';
+              const start = el.selectionStart ?? curVal.length;
+              const end = el.selectionEnd ?? start;
+              const newVal = curVal.slice(0, start) + text + curVal.slice(end);
+              if (setter) setter.call(el, newVal); else el.value = newVal;
+              el.selectionStart = el.selectionEnd = start + text.length;
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+              el.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: text }));
+            } else if (el.isContentEditable) {
+              document.execCommand('insertText', false, text);
+            }
+          })()
+        `);
+      },
+      async keystroke(params) {
+        const keys = params.keys || "Enter";
+        const parts = keys.split("+");
+        const key = parts.pop();
+        const mods = parts.map(m => m.toLowerCase());
+        await wv.executeJavaScript(`
+          (() => {
+            const el = document.activeElement || document.body;
+            const opts = {
+              key: ${JSON.stringify(key)},
+              code: ${JSON.stringify(key.length === 1 ? "Key" + key.toUpperCase() : key)},
+              keyCode: ${key === "Enter" ? 13 : key === "Tab" ? 9 : key === "Escape" ? 27 : key === "Backspace" ? 8 : key.length === 1 ? key.charCodeAt(0) : 0},
+              which: ${key === "Enter" ? 13 : key === "Tab" ? 9 : key === "Escape" ? 27 : key === "Backspace" ? 8 : key.length === 1 ? key.charCodeAt(0) : 0},
+              ctrlKey: ${mods.includes("ctrl") || mods.includes("control")},
+              shiftKey: ${mods.includes("shift")},
+              altKey: ${mods.includes("alt")},
+              metaKey: ${mods.includes("meta") || mods.includes("cmd")},
+              bubbles: true, cancelable: true
+            };
+            el.dispatchEvent(new KeyboardEvent('keydown', opts));
+            el.dispatchEvent(new KeyboardEvent('keypress', opts));
+            el.dispatchEvent(new KeyboardEvent('keyup', opts));
+            if (${JSON.stringify(key)} === 'Enter' && el.form) {
+              el.form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            }
+          })()
+        `);
+      },
+      async navigate(params) {
+        wv.loadURL(params.url);
+        await new Promise(resolve => { wv.addEventListener("did-finish-load", resolve, { once: true }); });
+      },
+      async wait(params) { await sleep(params.ms || 1000); },
+      async screenshot() {
+        const image = await wv.capturePage();
+        const pngBase64 = image.toPNG().toString("base64");
+        return await window.api.saveScreenshot(pngBase64);
+      },
+      async printPdf() {
+        const data = await wv.printToPDF({});
+        const pdfBase64 = Buffer.from(data).toString("base64");
+        return await window.api.savePdf(pdfBase64);
+      },
+      async scroll(params) {
+        await wv.executeJavaScript(`window.scrollBy(${params.dx || 0}, ${params.dy || 0})`);
+      },
+    };
+  }
+
+  async function runScriptOnWebview(wv, steps, onStep) {
+    const acts = makeActionsForWebview(wv);
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      if (onStep) onStep(i, step, "running");
+      try {
+        const executor = acts[step.action];
+        if (!executor) throw new Error(`Unknown action: ${step.action}`);
+        await executor(step.params || {});
+        await sleep(150);
+        if (onStep) onStep(i, step, "done");
+      } catch (err) {
+        if (onStep) onStep(i, step, "error", err.message);
+        throw err;
+      }
+    }
+  }
+
+  // Run different scripts on different identities in parallel.
+  // assignments: [{sessionId, steps}]
+  async function runMulti(assignments, onStatus) {
+    const promises = assignments.map(({ sessionId, steps, scriptName }) => {
+      // Find any tab for this identity, or open one
+      let tab = state.tabs.find(t => t.sessionId === sessionId);
+      if (!tab) {
+        openTab(sessionId);
+        tab = state.tabs[state.tabs.length - 1];
+      }
+      const wv = tab.webview;
+      return runScriptOnWebview(wv, steps, (i, step, status, err) => {
+        if (onStatus) onStatus(sessionId, scriptName, i, step, status, err);
+      }).then(() => ({ sessionId, scriptName, result: "done" }))
+        .catch(e => ({ sessionId, scriptName, result: "error", error: e.message }));
+    });
+    return Promise.all(promises);
+  }
+
+  return { actions, runScript, runScriptOnWebview, runMulti, startRecording, stopRecording, isRecording, getActiveWebview };
 })();

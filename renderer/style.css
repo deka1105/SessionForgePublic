@@ -411,6 +411,24 @@ body.is-recording #urlBar .recording-dot { display: block; }
 .auto-schedule-info { flex: 1; font-size: 11px; color: var(--accent); }
 .auto-schedule-cancel { font-size: 10px !important; }
 
+.auto-multi { border-color: #a78bfa; color: #a78bfa; }
+.auto-multi:hover { background: rgba(167,139,250,.1); }
+
+/* Multi-Run assignment list */
+.multi-list { max-height: 300px; overflow-y: auto; margin: 12px 0; }
+.multi-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.multi-row:last-child { border-bottom: none; }
+.multi-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.multi-name { flex: 1; font-size: 13px; font-weight: 500; }
+.multi-select {
+  padding: 4px 8px; border-radius: var(--radius-sm);
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  font-size: 11px; max-width: 160px;
+}
+
 .auto-step-fields { padding: 8px 10px; }
 .auto-field-label {
   display: block; font-size: 10px; color: var(--muted); margin-bottom: 6px;
