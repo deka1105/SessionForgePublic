@@ -68,6 +68,7 @@ const automationPanel = (() => {
         <button class="auto-btn auto-load" title="Load script">📂 Load</button>
         <button class="auto-btn auto-schedule" title="Schedule this script">⏰</button>
         <button class="auto-btn auto-multi" title="Run scripts on multiple identities">⚡ Multi</button>
+        <button class="auto-btn auto-history" title="View run history with screenshots">📜</button>
       </div>
       <div class="auto-steps"></div>
       <div class="auto-add-step">
@@ -92,6 +93,7 @@ const automationPanel = (() => {
     panelEl.querySelector(".auto-load").onclick = load;
     panelEl.querySelector(".auto-schedule").onclick = schedulePrompt;
     panelEl.querySelector(".auto-multi").onclick = openMultiRun;
+    panelEl.querySelector(".auto-history").onclick = showRunHistory;
     panelEl.querySelector(".auto-add-btn").onclick = addStep;
     panelEl.querySelector(".auto-clear-btn").onclick = () => { currentSteps = []; renderSteps(); };
     panelEl.querySelector(".auto-schedule-cancel").onclick = cancelSchedule;
@@ -234,28 +236,53 @@ const automationPanel = (() => {
   }
 
   function parseSchedule(input) {
-    let m = input.match(/^in\s+(\d+)\s*(s|m|h)$/i);
+    if (!input) return null;
+    const v = input.trim().toLowerCase();
+
+    // "in 5m" / "in 30s" / "in 2h" / "in 5 min" / "in 5 minutes"
+    let m = v.match(/^in\s+(\d+)\s*(s(?:ec)?|m(?:in)?|h(?:r|our)?)\w*$/);
     if (m) {
+      const unit = m[2][0]; // first char: s, m, or h
       const mult = { s: 1000, m: 60000, h: 3600000 };
-      return { type: "once", delay: parseInt(m[1]) * mult[m[2].toLowerCase()] };
+      return { type: "once", delay: parseInt(m[1]) * mult[unit] };
     }
-    m = input.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
+
+    // "15:30" or "3:00 PM" or "3:00pm"
+    m = v.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/);
     if (m) {
       let h = parseInt(m[1]); const min = parseInt(m[2]);
-      if (m[3]?.toLowerCase() === "pm" && h < 12) h += 12;
-      if (m[3]?.toLowerCase() === "am" && h === 12) h = 0;
+      if (m[3] === "pm" && h < 12) h += 12;
+      if (m[3] === "am" && h === 12) h = 0;
       const now = new Date();
       const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, min);
       if (target <= now) target.setDate(target.getDate() + 1);
       return { type: "once", delay: target - now };
     }
-    m = input.match(/^every\s+(\d+)\s*(s|m|h)$/i);
+
+    // "every 10m" / "every 5 min" / "every 1h" / "every 30s" / "every 10 minutes"
+    m = v.match(/^every\s+(\d+)\s*(s(?:ec)?|m(?:in)?|h(?:r|our)?)\w*$/);
     if (m) {
+      const unit = m[2][0];
       const mult = { s: 1000, m: 60000, h: 3600000 };
-      return { type: "recurring", interval: parseInt(m[1]) * mult[m[2].toLowerCase()] };
+      return { type: "recurring", interval: parseInt(m[1]) * mult[unit] };
     }
-    m = input.match(/^every\s+day\s+at\s+(\d{1,2}):(\d{2})$/i);
+
+    // "every day at 09:00"
+    m = v.match(/^every\s+day\s+at\s+(\d{1,2}):(\d{2})$/);
     if (m) return { type: "daily", hours: parseInt(m[1]), minutes: parseInt(m[2]) };
+
+    // Bare duration: "10m", "5min", "30s", "1h" → recurring
+    m = v.match(/^(\d+)\s*(s(?:ec)?|m(?:in)?|h(?:r|our)?)\w*$/);
+    if (m) {
+      const unit = m[2][0];
+      const mult = { s: 1000, m: 60000, h: 3600000 };
+      return { type: "recurring", interval: parseInt(m[1]) * mult[unit] };
+    }
+
+    // Simple number assumed as minutes: "10" → every 10m
+    m = v.match(/^(\d+)$/);
+    if (m) return { type: "recurring", interval: parseInt(m[1]) * 60000 };
+
     return null;
   }
 
@@ -391,7 +418,81 @@ const automationPanel = (() => {
     logEl.scrollTop = logEl.scrollHeight;
   }
 
-  // ── Multi-Run: assign scripts to identities, run in parallel ────────
+  // ── Run History (before/after screenshots) ─────────────────────────────
+  const runHistory = []; // [{timestamp, identity, tab, script, schedule, beforeImg, afterImg}]
+
+  function showRunHistory() {
+    if (!panelEl) return;
+    const existing = panelEl.querySelector(".run-history-panel");
+    if (existing) { existing.remove(); return; }
+
+    const panel = document.createElement("div");
+    panel.className = "run-history-panel";
+    panel.innerHTML = `
+      <div class="rh-header"><h4>Run History</h4><button class="rh-close">×</button></div>
+      <div class="rh-list"></div>
+    `;
+    panel.querySelector(".rh-close").onclick = () => panel.remove();
+    panelEl.append(panel);
+
+    const list = panel.querySelector(".rh-list");
+    if (!runHistory.length) { list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:11px;">No runs yet</div>'; return; }
+
+    for (const run of [...runHistory].reverse()) {
+      const statusIcon = run.status === "waiting" ? "⏳" : run.status === "running" ? "⚙️" : run.status === "error" ? "✗" : "✓";
+      const statusClass = `rh-status-${run.status || "complete"}`;
+      const item = document.createElement("div");
+      item.className = "rh-item";
+      item.innerHTML = `
+        <div class="rh-meta">
+          <span class="rh-status-badge ${statusClass}">${statusIcon}</span>
+          <span class="rh-identity">${run.identity || "?"}</span>
+          <span class="rh-script">${run.script}</span>
+          ${run.schedInput ? `<span class="rh-sched-label">${run.schedInput}</span>` : ""}
+          <span class="rh-time">${new Date(run.timestamp).toLocaleString()}</span>
+        </div>
+        ${(run.beforeImg || run.afterImg) ? `<div class="rh-thumbs">
+          ${run.beforeImg ? `<img class="rh-thumb" src="${run.beforeImg}" title="Before">` : '<span class="rh-no-img">—</span>'}
+          <span class="rh-arrow">→</span>
+          ${run.afterImg ? `<img class="rh-thumb" src="${run.afterImg}" title="After">` : '<span class="rh-no-img">pending</span>'}
+        </div>` : ""}
+      `;
+      item.querySelectorAll(".rh-thumb").forEach(img => {
+        img.onclick = (e) => {
+          e.stopPropagation();
+          showFullScreenshot(img.src, img.title);
+        };
+      });
+      list.append(item);
+    }
+  }
+
+  function showFullScreenshot(src, title) {
+    const overlay = document.createElement("div");
+    overlay.className = "auto-prompt-overlay";
+    overlay.style.cursor = "zoom-out";
+    overlay.innerHTML = `
+      <div style="max-width:90vw;max-height:90vh;position:relative;">
+        <div style="color:var(--text);font-size:12px;margin-bottom:8px;">${title}</div>
+        <img src="${src}" style="max-width:100%;max-height:85vh;border-radius:8px;border:1px solid var(--border);">
+      </div>
+    `;
+    overlay.onclick = () => overlay.remove();
+    document.body.append(overlay);
+  }
+
+  async function captureScreenshot(wv) {
+    try {
+      if (!wv) return null;
+      // capturePage() only works safely on the active webview in this Electron version
+      if (!wv.classList.contains("active")) return null;
+      const image = await wv.capturePage();
+      if (!image || image.isEmpty()) return null;
+      return "data:image/png;base64," + image.toPNG().toString("base64");
+    } catch { return null; }
+  }
+
+  // ── Multi-Run: Identity → Tab → Script → Schedule ─────────────────────
   async function openMultiRun() {
     const scripts = await window.api.listScripts();
     if (!scripts.length) { log("Save some scripts first", "warn"); return; }
@@ -399,55 +500,66 @@ const automationPanel = (() => {
     const overlay = document.createElement("div");
     overlay.className = "auto-prompt-overlay";
 
+    const scriptOptions = scripts.map(sc => `<option value="${sc.filename}">${sc.name}</option>`).join("");
+
     const identityRows = state.sessions.map(s => {
-      const options = scripts.map(sc => `<option value="${sc.filename}">${sc.name}</option>`).join("");
+      const identityTabs = state.tabs.filter(t => t.sessionId === s.id);
+      const tabOptions = identityTabs.map(t =>
+        `<option value="${t.id}">${(t.title || t.url).slice(0, 30)}</option>`
+      ).join("");
+
       return `
         <div class="multi-row" data-session="${s.id}">
           <span class="multi-dot" style="background:${s.color}"></span>
           <span class="multi-name">${s.name}</span>
-          <select class="multi-select" data-session="${s.id}">
-            <option value="">— skip —</option>
-            ${options}
+          <select class="multi-tab-select" data-session="${s.id}" title="Tab">
+            <option value="">Tab…</option>
+            ${tabOptions}
           </select>
-          <button class="multi-remove" title="Remove from list">×</button>
+          <select class="multi-script-select" data-session="${s.id}" title="Script">
+            <option value="">Script…</option>
+            ${scriptOptions}
+          </select>
+          <input class="multi-sched-input" placeholder="now" title="Schedule" data-session="${s.id}">
+          <button class="multi-remove" title="Remove">×</button>
         </div>
       `;
     }).join("");
 
-    // Show existing active schedules
+    // Active schedules
     const activeScheds = Object.entries(state.tabSchedules || {}).map(([tabId, sched]) => {
       const tab = state.tabs.find(t => t.id === tabId);
       const identity = tab ? state.sessions.find(s => s.id === tab.sessionId) : null;
       return `<div class="multi-active-sched">
         <span class="multi-dot" style="background:${identity?.color || '#888'}"></span>
-        <span>${identity?.name || "?"} → ${sched.scriptName} (${sched.schedInput})</span>
+        <span>${identity?.name || "?"} → ${(tab?.title || "").slice(0,20)} → ${sched.scriptName} (${sched.schedInput})</span>
         <button class="multi-cancel-sched" data-tab="${tabId}" title="Cancel">×</button>
       </div>`;
     }).join("");
 
     overlay.innerHTML = `
-      <div class="auto-prompt-box" style="width:420px;">
-        <div class="auto-prompt-title">Multi-Run: Assign Scripts to Identities</div>
-        <div class="multi-list">${identityRows}</div>
-        <div class="multi-schedule-section">
-          <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">Schedule (optional — leave empty for immediate)</label>
-          <input class="auto-prompt-input multi-schedule-input" placeholder="e.g. now, in 5m, every 10m, 15:30">
+      <div class="auto-prompt-box" style="width:560px;">
+        <div class="auto-prompt-title">Multi-Run</div>
+        <div class="multi-col-headers">
+          <span>Identity</span><span>Tab</span><span>Script</span><span>Schedule</span><span></span>
         </div>
+        <div class="multi-list">${identityRows}</div>
         ${activeScheds ? `<div class="multi-active-section"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:6px;">Active Schedules</label>${activeScheds}</div>` : ""}
         <div class="auto-prompt-actions">
           <button class="auto-prompt-cancel">Cancel</button>
+          <button class="auto-btn" onclick="" id="multi-history-btn">📜 History</button>
           <button class="auto-prompt-ok">Run</button>
         </div>
       </div>
     `;
     document.body.append(overlay);
 
-    // Wire remove buttons to hide rows
+    // Wire remove
     overlay.querySelectorAll(".multi-remove").forEach(btn => {
       btn.onclick = (e) => { e.stopPropagation(); btn.closest(".multi-row").remove(); };
     });
 
-    // Wire cancel-schedule buttons
+    // Wire cancel-schedule
     overlay.querySelectorAll(".multi-cancel-sched").forEach(btn => {
       btn.onclick = () => {
         const tabId = btn.dataset.tab;
@@ -462,40 +574,112 @@ const automationPanel = (() => {
       };
     });
 
+    // History button
+    overlay.querySelector("#multi-history-btn").onclick = () => { overlay.remove(); showRunHistory(); };
+
     await new Promise((resolve) => {
       overlay.querySelector(".auto-prompt-cancel").onclick = () => { overlay.remove(); resolve(); };
       overlay.querySelector(".auto-prompt-ok").onclick = async () => {
-        const selects = overlay.querySelectorAll(".multi-select");
+        const rows = overlay.querySelectorAll(".multi-row");
         const assignments = [];
-        for (const sel of selects) {
-          if (!sel.value) continue;
-          const sessionId = sel.dataset.session;
-          const script = scripts.find(s => s.filename === sel.value);
-          if (script?.steps) assignments.push({ sessionId, steps: script.steps, scriptName: script.name });
+        for (const row of rows) {
+          const sessionId = row.dataset.session;
+          const tabId = row.querySelector(".multi-tab-select").value;
+          const scriptFile = row.querySelector(".multi-script-select").value;
+          const schedInput = row.querySelector(".multi-sched-input").value.trim();
+          if (!scriptFile) continue;
+          const script = scripts.find(s => s.filename === scriptFile);
+          if (!script?.steps) continue;
+          const tab = tabId ? state.tabs.find(t => t.id === tabId) : state.tabs.find(t => t.sessionId === sessionId);
+          if (!tab) continue;
+          assignments.push({ sessionId, tabId: tab.id, steps: script.steps, scriptName: script.name, schedInput: schedInput || "now" });
         }
-
-        const scheduleInput = overlay.querySelector(".multi-schedule-input")?.value.trim() || "";
         overlay.remove();
 
-        if (!assignments.length) { log("No assignments selected", "warn"); resolve(); return; }
+        if (!assignments.length) { log("No assignments", "warn"); resolve(); return; }
 
-        if (!scheduleInput || scheduleInput === "now") {
-          await executeMultiRun(assignments);
-        } else {
-          scheduleMultiRun(assignments, scheduleInput);
+        // Separate immediate vs scheduled
+        const immediate = assignments.filter(a => !a.schedInput || a.schedInput === "now");
+        const scheduled = assignments.filter(a => a.schedInput && a.schedInput !== "now");
+
+        if (immediate.length) await executeMultiRunV2(immediate);
+
+        for (const a of scheduled) {
+          const parsed = parseSchedule(a.schedInput);
+          if (!parsed) { log(`Bad schedule "${a.schedInput}" for ${a.scriptName}`, "error"); continue; }
+
+          // Add to run history as "waiting"
+          const histEntry = { timestamp: Date.now(), identity: state.sessions.find(s => s.id === a.sessionId)?.name, tab: state.tabs.find(t => t.id === a.tabId)?.title, script: a.scriptName, status: "waiting", schedInput: a.schedInput, beforeImg: null, afterImg: null };
+          runHistory.push(histEntry);
+
+          // Store schedule in tabSchedules so sidebar shows badge
+          const runFn = async () => {
+            histEntry.status = "running";
+            await executeMultiRunV2([a]);
+            histEntry.status = "complete";
+            histEntry.timestamp = Date.now();
+          };
+
+          let timer;
+          if (parsed.type === "once") {
+            timer = setTimeout(runFn, parsed.delay);
+            log(`Scheduled: ${a.scriptName} in ${a.schedInput}`, "success");
+          } else if (parsed.type === "recurring") {
+            timer = setInterval(runFn, parsed.interval);
+            log(`Recurring: ${a.scriptName} ${a.schedInput}`, "success");
+          } else if (parsed.type === "daily") {
+            timer = setInterval(() => {
+              const now = new Date();
+              if (now.getHours() === parsed.hours && now.getMinutes() === parsed.minutes && now.getSeconds() < 30) runFn();
+            }, 30000);
+            log(`Daily: ${a.scriptName} at ${a.schedInput}`, "success");
+          }
+
+          state.tabSchedules[a.tabId] = { scriptName: a.scriptName, schedInput: a.schedInput, timer };
+          renderSidebar();
         }
         resolve();
       };
     });
   }
 
-  async function executeMultiRun(assignments) {
-    log(`Multi-Run: ${assignments.length} identities…`, "info");
-    const results = await automation.runMulti(assignments, (sessionId, scriptName, i, step, status, err) => {
-      const identity = state.sessions.find(s => s.id === sessionId);
-      if (status === "running") log(`[${identity?.name}] Step ${i+1}: ${step.action}…`);
-      else if (status === "error") log(`[${identity?.name}] Step ${i+1} failed: ${err}`, "error");
+  async function executeMultiRunV2(assignments) {
+    log(`Multi-Run: ${assignments.length} tasks…`, "info");
+
+    const promises = assignments.map(async (a) => {
+      const tab = state.tabs.find(t => t.id === a.tabId);
+      if (!tab) return { ...a, result: "error", error: "Tab not found" };
+      const identity = state.sessions.find(s => s.id === a.sessionId);
+      const wv = tab.webview;
+      if (!wv || !wv.executeJavaScript) return { ...a, result: "error", error: "Webview not ready" };
+
+      // Create history entry as "running"
+      const histEntry = { timestamp: Date.now(), identity: identity?.name, tab: tab.title, script: a.scriptName, status: "running", beforeImg: null, afterImg: null };
+      runHistory.push(histEntry);
+
+      // Capture before screenshot
+      histEntry.beforeImg = await captureScreenshot(wv);
+
+      // Run the script
+      try {
+        await automation.runScriptOnWebview(wv, a.steps, (i, step, status, err) => {
+          if (status === "running") log(`[${identity?.name}] Step ${i+1}: ${step.action}…`);
+          else if (status === "error") log(`[${identity?.name}] Step ${i+1}: ${err}`, "error");
+        });
+      } catch (e) {
+        histEntry.status = "error";
+        return { ...a, result: "error", error: e.message };
+      }
+
+      // Wait 5 seconds then capture after screenshot
+      await new Promise(r => setTimeout(r, 5000));
+      histEntry.afterImg = await captureScreenshot(wv);
+      histEntry.status = "complete";
+      histEntry.timestamp = Date.now();
+      return { ...a, result: "done" };
     });
+
+    const results = await Promise.all(promises);
     for (const r of results) {
       const identity = state.sessions.find(s => s.id === r.sessionId);
       if (r.result === "done") log(`[${identity?.name}] ✓ ${r.scriptName} complete`, "success");
@@ -509,23 +693,23 @@ const automationPanel = (() => {
 
     if (parsed.type === "once") {
       const when = new Date(Date.now() + parsed.delay);
-      log(`Multi-Run scheduled for ${when.toLocaleTimeString()} (${assignments.length} identities)`, "success");
-      setTimeout(() => { log("Scheduled Multi-Run…", "info"); executeMultiRun(assignments); }, parsed.delay);
+      log(`Multi-Run scheduled for ${when.toLocaleTimeString()}`, "success");
+      setTimeout(() => { log("Scheduled Multi-Run…", "info"); executeMultiRunV2(assignments); }, parsed.delay);
     } else if (parsed.type === "recurring") {
       const label = parsed.interval >= 60000 ? `${parsed.interval / 60000}m` : `${parsed.interval / 1000}s`;
-      log(`Multi-Run recurring every ${label} (${assignments.length} identities)`, "success");
-      setInterval(() => { log("Recurring Multi-Run…", "info"); executeMultiRun(assignments); }, parsed.interval);
+      log(`Multi-Run recurring every ${label}`, "success");
+      setInterval(() => { log("Recurring Multi-Run…", "info"); executeMultiRunV2(assignments); }, parsed.interval);
     } else if (parsed.type === "daily") {
       const t = `${String(parsed.hours).padStart(2,"0")}:${String(parsed.minutes).padStart(2,"0")}`;
-      log(`Multi-Run daily at ${t} (${assignments.length} identities)`, "success");
+      log(`Multi-Run daily at ${t}`, "success");
       setInterval(() => {
         const now = new Date();
         if (now.getHours() === parsed.hours && now.getMinutes() === parsed.minutes && now.getSeconds() < 30) {
-          log("Daily Multi-Run…", "info"); executeMultiRun(assignments);
+          log("Daily Multi-Run…", "info"); executeMultiRunV2(assignments);
         }
       }, 30000);
     }
   }
 
-  return { toggle, create, loadSteps };
+  return { toggle, create, loadSteps, showRunHistory };
 })();

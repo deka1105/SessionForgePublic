@@ -252,22 +252,28 @@ function scheduleOnTab(tabId, sessionId, script, schedInput) {
 }
 
 function parseScheduleStr(input) {
-  let m = input.match(/^in\s+(\d+)\s*(s|m|h)$/i);
-  if (m) return { type: "once", delay: parseInt(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2].toLowerCase()] };
-  m = input.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
+  if (!input) return null;
+  const v = input.trim().toLowerCase();
+  let m = v.match(/^in\s+(\d+)\s*(s(?:ec)?|m(?:in)?|h(?:r|our)?)\w*$/);
+  if (m) return { type: "once", delay: parseInt(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2][0]] };
+  m = v.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/);
   if (m) {
     let h = parseInt(m[1]); const min = parseInt(m[2]);
-    if (m[3]?.toLowerCase() === "pm" && h < 12) h += 12;
-    if (m[3]?.toLowerCase() === "am" && h === 12) h = 0;
+    if (m[3] === "pm" && h < 12) h += 12;
+    if (m[3] === "am" && h === 12) h = 0;
     const now = new Date();
     const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, min);
     if (target <= now) target.setDate(target.getDate() + 1);
     return { type: "once", delay: target - now };
   }
-  m = input.match(/^every\s+(\d+)\s*(s|m|h)$/i);
-  if (m) return { type: "recurring", interval: parseInt(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2].toLowerCase()] };
-  m = input.match(/^every\s+day\s+at\s+(\d{1,2}):(\d{2})$/i);
+  m = v.match(/^every\s+(\d+)\s*(s(?:ec)?|m(?:in)?|h(?:r|our)?)\w*$/);
+  if (m) return { type: "recurring", interval: parseInt(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2][0]] };
+  m = v.match(/^every\s+day\s+at\s+(\d{1,2}):(\d{2})$/);
   if (m) return { type: "daily", hours: parseInt(m[1]), minutes: parseInt(m[2]) };
+  m = v.match(/^(\d+)\s*(s(?:ec)?|m(?:in)?|h(?:r|our)?)\w*$/);
+  if (m) return { type: "recurring", interval: parseInt(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2][0]] };
+  m = v.match(/^(\d+)$/);
+  if (m) return { type: "recurring", interval: parseInt(m[1]) * 60000 };
   return null;
 }
 
