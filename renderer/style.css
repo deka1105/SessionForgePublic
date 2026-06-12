@@ -122,17 +122,52 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
    collapsed icon-rail enlarges the swatch enough for it to be visible. */
 .sess-favicon { display: none; }
 .sess-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sess-edit, .sess-x {
+.sess-edit, .sess-x, .sess-export {
   background: transparent; border: none; color: var(--muted);
   cursor: pointer; padding: 0 4px;
   opacity: 0; transition: opacity .15s, color .15s;
 }
 .sess-edit { font-size: 12px; }
 .sess-x    { font-size: 16px; }
+.sess-export { font-size: 12px; }
 .sess-item:hover .sess-edit,
-.sess-item:hover .sess-x    { opacity: 1; }
+.sess-item:hover .sess-x,
+.sess-item:hover .sess-export { opacity: 1; }
 .sess-edit:hover { color: var(--text); }
 .sess-x:hover    { color: var(--danger); }
+.sess-export:hover { color: var(--accent); }
+
+/* Identity tree structure */
+.tree-node { list-style: none; }
+.tree-header { cursor: pointer; }
+.tree-header.drop-target { background: rgba(110,168,255,.15); border-radius: var(--radius-sm); }
+.tree-chevron { font-size: 10px; color: var(--muted); width: 14px; text-align: center; flex-shrink: 0; }
+.tree-count { font-size: 10px; color: var(--muted); background: var(--bg); padding: 1px 5px; border-radius: 8px; margin-left: auto; }
+
+.tree-tabs { list-style: none; padding: 0 0 0 22px; margin: 2px 0 6px; }
+.tree-tab {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 8px; border-radius: var(--radius-sm); cursor: pointer;
+  font-size: 11px; color: var(--muted);
+}
+.tree-tab:hover { background: var(--bg-hover); color: var(--text); }
+.tree-tab.active { color: var(--text); background: var(--bg-hover); }
+.tree-tab-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-tab-sched-badge { font-size: 10px; }
+.tree-tab-sched {
+  background: transparent; border: none; color: var(--muted);
+  font-size: 10px; cursor: pointer; opacity: 0; padding: 0 2px;
+  transition: opacity .15s;
+}
+.tree-tab-close {
+  background: transparent; border: none; color: var(--muted);
+  font-size: 13px; cursor: pointer; opacity: 0; padding: 0 2px;
+  transition: opacity .15s;
+}
+.tree-tab:hover .tree-tab-sched,
+.tree-tab:hover .tree-tab-close { opacity: 1; }
+.tree-tab-sched:hover { color: var(--accent); }
+.tree-tab-close:hover { color: var(--danger); }
 
 .hint { color: var(--muted); font-size: 11px; margin-top: auto; padding-top: 14px; }
 
@@ -537,6 +572,23 @@ body.is-recording #urlBar .recording-dot { display: block; }
   background: var(--bg); border: 1px solid var(--border); color: var(--text);
   font-size: 11px; max-width: 160px;
 }
+.multi-remove {
+  background: transparent; border: none; color: var(--muted);
+  font-size: 14px; cursor: pointer; padding: 0 4px;
+}
+.multi-remove:hover { color: var(--danger); }
+.multi-schedule-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.multi-active-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); max-height: 120px; overflow-y: auto; }
+.multi-active-sched {
+  display: flex; align-items: center; gap: 6px; padding: 4px 0;
+  font-size: 11px; color: var(--muted);
+}
+.multi-active-sched span { flex: 1; }
+.multi-cancel-sched {
+  background: transparent; border: none; color: var(--muted);
+  font-size: 13px; cursor: pointer;
+}
+.multi-cancel-sched:hover { color: var(--danger); }
 
 .auto-step-fields { padding: 8px 10px; }
 .auto-field-label {

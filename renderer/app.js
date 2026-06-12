@@ -90,19 +90,17 @@ function restoreTabs() {
   }
 }
 
-// ── sidebar (identities) ─────────────────────────────────────────────────
+// ── sidebar tree (identity → open tabs) ──────────────────────────────────
 function renderSidebar() {
   const ul = $("sessionList");
   ul.replaceChildren();
   for (const s of state.sessions) {
+    const identityTabs = state.tabs.filter(t => t.sessionId === s.id);
+    const isExpanded = state.sidebarExpanded?.[s.id] !== false; // default expanded
+
     const dot = el("span", { className: "swatch" });
-    // Use a CSS variable so the same colour can be applied as either fill
-    // (expanded dot) or border (collapsed tile) without inline-style fights.
     dot.style.setProperty("--swatch-color", s.color);
 
-    // Overlay the favicon of the identity's most-relevant tab on top of the
-    // colour swatch — useful in the collapsed icon-rail where the tile is
-    // the only signal of what site is open.
     const tabForFavicon =
       state.tabs.find(t => t.id === state.lastTabPerSess[s.id]) ??
       state.tabs.find(t => t.sessionId === s.id);
@@ -110,28 +108,167 @@ function renderSidebar() {
       dot.append(el("img", { className: "sess-favicon", src: tabForFavicon.favicon, alt: "" }));
     }
 
-    const li = el("li", { className: "sess-item", title: `Switch to "${s.name}"` },
+    // Identity header row
+    const chevron = el("span", { className: "tree-chevron", textContent: isExpanded ? "⌄" : "›" });
+    const tabCount = el("span", { className: "tree-count", textContent: `${identityTabs.length}` });
+
+    const header = el("div", { className: "sess-item tree-header" },
+      chevron,
       dot,
       el("span", { className: "sess-name", textContent: s.name }),
+      tabCount,
       el("button", { className: "sess-export", title: "Export identity", textContent: "↑",
                      onclick: e => { e.stopPropagation(); window.api.exportIdentity(s.id); } }),
-      el("button", { className: "sess-edit", title: "Rename or recolour identity", textContent: "✎",
+      el("button", { className: "sess-edit", title: "Rename or recolour", textContent: "✎",
                      onclick: e => { e.stopPropagation(); openSessionModal({ editingId: s.id }); } }),
-      el("button", { className: "sess-x", title: "Delete identity (wipes cookies)", textContent: "×",
+      el("button", { className: "sess-x", title: "Delete identity", textContent: "×",
                      onclick: e => { e.stopPropagation(); deleteSession(s.id); } }),
     );
-    li.onclick = () => focusIdentity(s.id);
+
+    header.onclick = () => {
+      if (!state.sidebarExpanded) state.sidebarExpanded = {};
+      state.sidebarExpanded[s.id] = !isExpanded;
+      renderSidebar();
+    };
+
     // Drag-tab-onto-identity to rebind
-    li.addEventListener("dragover", (e) => { e.preventDefault(); li.classList.add("drop-target"); });
-    li.addEventListener("dragleave", () => li.classList.remove("drop-target"));
-    li.addEventListener("drop", (e) => {
+    header.addEventListener("dragover", (e) => { e.preventDefault(); header.classList.add("drop-target"); });
+    header.addEventListener("dragleave", () => header.classList.remove("drop-target"));
+    header.addEventListener("drop", (e) => {
       e.preventDefault();
-      li.classList.remove("drop-target");
+      header.classList.remove("drop-target");
       const tabId = e.dataTransfer.getData("text/plain");
       rebindTab(tabId, s.id);
     });
+
+    const li = el("li", { className: "tree-node" });
+    li.append(header);
+
+    // Tab children (nested under the identity)
+    if (isExpanded && identityTabs.length > 0) {
+      const tabList = el("ul", { className: "tree-tabs" });
+      for (const t of identityTabs) {
+        const isActive = t.id === state.activeTab;
+        const hasSchedule = state.tabSchedules?.[t.id];
+        const tabItem = el("li", {
+          className: "tree-tab" + (isActive ? " active" : ""),
+          title: t.url,
+        },
+          el("span", { className: "tree-tab-title", textContent: t.title || t.url.slice(0, 25) }),
+          ...(hasSchedule ? [el("span", { className: "tree-tab-sched-badge", textContent: "⏰" })] : []),
+          el("button", { className: "tree-tab-sched", title: "Schedule script on this tab", textContent: "⏰",
+            onclick: (e) => { e.stopPropagation(); openTabSchedule(t.id, s.id); }
+          }),
+          el("button", { className: "tree-tab-close", title: "Close tab", textContent: "×",
+            onclick: (e) => { e.stopPropagation(); closeTab(t.id); }
+          }),
+        );
+        tabItem.onclick = () => activateTab(t.id);
+        tabList.append(tabItem);
+      }
+      li.append(tabList);
+    }
+
     ul.append(li);
   }
+}
+
+// Per-tab scheduling state: { [tabId]: { scriptName, schedule, timer } }
+if (!state.sidebarExpanded) state.sidebarExpanded = {};
+if (!state.tabSchedules) state.tabSchedules = {};
+
+async function openTabSchedule(tabId, sessionId) {
+  const scripts = await window.api.listScripts();
+  if (!scripts.length) { alert("Save some scripts first"); return; }
+
+  const overlay = document.createElement("div");
+  overlay.className = "auto-prompt-overlay";
+  const options = scripts.map(sc => `<option value="${sc.filename}">${sc.name}</option>`).join("");
+
+  overlay.innerHTML = `
+    <div class="auto-prompt-box" style="width:360px;">
+      <div class="auto-prompt-title">Schedule Script on This Tab</div>
+      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:4px;">Script</label>
+      <select class="auto-prompt-input" id="ts-script">${options}</select>
+      <label style="font-size:11px;color:var(--muted);display:block;margin:10px 0 4px;">Schedule</label>
+      <input class="auto-prompt-input" id="ts-schedule" placeholder="e.g. every 10m, in 5m, 15:30">
+      <div class="auto-prompt-actions">
+        <button class="auto-prompt-cancel">Cancel</button>
+        <button class="auto-prompt-ok">Schedule</button>
+      </div>
+    </div>
+  `;
+  document.body.append(overlay);
+
+  await new Promise((resolve) => {
+    overlay.querySelector(".auto-prompt-cancel").onclick = () => { overlay.remove(); resolve(); };
+    overlay.querySelector(".auto-prompt-ok").onclick = () => {
+      const filename = overlay.querySelector("#ts-script").value;
+      const schedInput = overlay.querySelector("#ts-schedule").value.trim();
+      overlay.remove();
+      if (!filename || !schedInput) { resolve(); return; }
+
+      const script = scripts.find(s => s.filename === filename);
+      if (!script?.steps) { resolve(); return; }
+
+      scheduleOnTab(tabId, sessionId, script, schedInput);
+      resolve();
+    };
+  });
+}
+
+function scheduleOnTab(tabId, sessionId, script, schedInput) {
+  const parsed = parseScheduleStr(schedInput);
+  if (!parsed) return;
+
+  // Cancel existing schedule on this tab
+  if (state.tabSchedules[tabId]?.timer) {
+    clearInterval(state.tabSchedules[tabId].timer);
+    clearTimeout(state.tabSchedules[tabId].timer);
+  }
+
+  const tab = state.tabs.find(t => t.id === tabId);
+  if (!tab) return;
+
+  const runOnce = () => {
+    const wv = tab.webview;
+    automation.runScriptOnWebview(wv, script.steps, null);
+  };
+
+  let timer;
+  if (parsed.type === "once") {
+    timer = setTimeout(() => { runOnce(); delete state.tabSchedules[tabId]; renderSidebar(); }, parsed.delay);
+  } else if (parsed.type === "recurring") {
+    timer = setInterval(runOnce, parsed.interval);
+  } else if (parsed.type === "daily") {
+    timer = setInterval(() => {
+      const now = new Date();
+      if (now.getHours() === parsed.hours && now.getMinutes() === parsed.minutes && now.getSeconds() < 30) runOnce();
+    }, 30000);
+  }
+
+  state.tabSchedules[tabId] = { scriptName: script.name, schedInput, timer };
+  renderSidebar();
+}
+
+function parseScheduleStr(input) {
+  let m = input.match(/^in\s+(\d+)\s*(s|m|h)$/i);
+  if (m) return { type: "once", delay: parseInt(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2].toLowerCase()] };
+  m = input.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
+  if (m) {
+    let h = parseInt(m[1]); const min = parseInt(m[2]);
+    if (m[3]?.toLowerCase() === "pm" && h < 12) h += 12;
+    if (m[3]?.toLowerCase() === "am" && h === 12) h = 0;
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, min);
+    if (target <= now) target.setDate(target.getDate() + 1);
+    return { type: "once", delay: target - now };
+  }
+  m = input.match(/^every\s+(\d+)\s*(s|m|h)$/i);
+  if (m) return { type: "recurring", interval: parseInt(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2].toLowerCase()] };
+  m = input.match(/^every\s+day\s+at\s+(\d{1,2}):(\d{2})$/i);
+  if (m) return { type: "daily", hours: parseInt(m[1]), minutes: parseInt(m[2]) };
+  return null;
 }
 
 async function createSession(name, color) {
