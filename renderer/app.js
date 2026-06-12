@@ -113,12 +113,23 @@ function renderSidebar() {
     const li = el("li", { className: "sess-item", title: `Switch to "${s.name}"` },
       dot,
       el("span", { className: "sess-name", textContent: s.name }),
+      el("button", { className: "sess-export", title: "Export identity", textContent: "↑",
+                     onclick: e => { e.stopPropagation(); window.api.exportIdentity(s.id); } }),
       el("button", { className: "sess-edit", title: "Rename or recolour identity", textContent: "✎",
                      onclick: e => { e.stopPropagation(); openSessionModal({ editingId: s.id }); } }),
       el("button", { className: "sess-x", title: "Delete identity (wipes cookies)", textContent: "×",
                      onclick: e => { e.stopPropagation(); deleteSession(s.id); } }),
     );
     li.onclick = () => focusIdentity(s.id);
+    // Drag-tab-onto-identity to rebind
+    li.addEventListener("dragover", (e) => { e.preventDefault(); li.classList.add("drop-target"); });
+    li.addEventListener("dragleave", () => li.classList.remove("drop-target"));
+    li.addEventListener("drop", (e) => {
+      e.preventDefault();
+      li.classList.remove("drop-target");
+      const tabId = e.dataTransfer.getData("text/plain");
+      rebindTab(tabId, s.id);
+    });
     ul.append(li);
   }
 }
@@ -161,9 +172,14 @@ function openTab(sessionId, url = DEFAULT_HOME) {
   // Wire up webview events so the URL bar + tab title track navigation.
   // Each event persists tabs so a relaunch restores the latest URL/title.
   wv.addEventListener("page-title-updated",  e => { tab.title = e.title; renderTabs(); persistTabs(); });
-  wv.addEventListener("did-navigate",        e => { tab.url   = e.url;   if (id === state.activeTab) $("urlInput").value = e.url; persistTabs(); });
-  wv.addEventListener("did-navigate-in-page",e => { tab.url   = e.url;   if (id === state.activeTab) $("urlInput").value = e.url; persistTabs(); });
+  wv.addEventListener("did-navigate",        e => { tab.url = e.url; if (id === state.activeTab) $("urlInput").value = e.url; persistTabs(); recordHistory(sessionId, e.url, tab.title); });
+  wv.addEventListener("did-navigate-in-page",e => { tab.url = e.url; if (id === state.activeTab) $("urlInput").value = e.url; persistTabs(); });
   wv.addEventListener("page-favicon-updated",e => { tab.favicon = e.favicons?.[0] ?? null; renderSidebar(); persistTabs(); });
+  wv.addEventListener("found-in-page", e => {
+    if (id === state.activeTab && e.result) {
+      $("findCount").textContent = `${e.result.activeMatchOrdinal}/${e.result.matches}`;
+    }
+  });
 
   activateTab(id);
   persistTabs();
@@ -185,6 +201,7 @@ function activateTab(id) {
   }
   $("emptyState").hidden = state.tabs.length > 0;
   renderTabs();
+  renderBookmarksBar();
   persistTabs();
 }
 
@@ -264,12 +281,17 @@ function renderTabs() {
       const node = el("div", {
         className: "tab" + (t.id === state.activeTab ? " active" : ""),
         title:     `${s?.name ?? "?"} — ${t.url}`,
+        draggable: true,
         onclick:   () => activateTab(t.id),
       },
         el("span",   { className: "tab-title", textContent: t.title || t.url }),
         el("button", { className: "tab-x", textContent: "×",
                        onclick: e => { e.stopPropagation(); closeTab(t.id); } }),
       );
+      node.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", t.id);
+        e.dataTransfer.effectAllowed = "move";
+      });
       group.append(node);
     }
 
@@ -414,6 +436,153 @@ document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "a") {
     e.preventDefault();
     automationPanel.toggle();
+  }
+});
+
+// ── drag-tab-onto-identity (rebind) ──────────────────────────────────────
+function rebindTab(tabId, newSessionId) {
+  const tab = state.tabs.find(t => t.id === tabId);
+  if (!tab || tab.sessionId === newSessionId) return;
+  const url = tab.url;
+  closeTab(tabId);
+  openTab(newSessionId, url);
+}
+
+// ── bookmarks (per-identity) ─────────────────────────────────────────────
+async function renderBookmarksBar() {
+  const bar = $("bookmarksBar");
+  bar.replaceChildren();
+  const t = state.tabs.find(t => t.id === state.activeTab);
+  if (!t) return;
+  const bookmarks = await window.api.getBookmarks(t.sessionId);
+  for (const bm of bookmarks) {
+    const btn = el("button", { className: "bookmark-chip", title: bm.url, textContent: bm.title || bm.url.slice(0, 20) });
+    btn.onclick = () => navigate(bm.url);
+    btn.oncontextmenu = async (e) => {
+      e.preventDefault();
+      await window.api.removeBookmark(t.sessionId, bm.id);
+      renderBookmarksBar();
+    };
+    bar.append(btn);
+  }
+}
+
+$("bookmarkBtn").onclick = async () => {
+  const t = state.tabs.find(t => t.id === state.activeTab);
+  if (!t) return;
+  await window.api.addBookmark(t.sessionId, { url: t.url, title: t.title });
+  $("bookmarkBtn").textContent = "★";
+  renderBookmarksBar();
+  setTimeout(() => { $("bookmarkBtn").textContent = "☆"; }, 1500);
+};
+
+// Cmd+D / Ctrl+D — bookmark
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") {
+    e.preventDefault();
+    $("bookmarkBtn").click();
+  }
+});
+
+// ── per-identity history ─────────────────────────────────────────────────
+function recordHistory(sessionId, url, title) {
+  if (!url || url === "about:blank") return;
+  window.api.addHistory(sessionId, { url, title: title || url });
+}
+
+async function openHistory() {
+  const panel = $("historyPanel");
+  panel.hidden = !panel.hidden;
+  if (panel.hidden) return;
+  await renderHistory();
+}
+
+async function renderHistory(filter = "") {
+  const t = state.tabs.find(t => t.id === state.activeTab);
+  if (!t) return;
+  const entries = await window.api.getHistory(t.sessionId);
+  const list = $("historyList");
+  list.replaceChildren();
+  const q = filter.toLowerCase();
+  const filtered = entries.filter(e => !q || e.url?.toLowerCase().includes(q) || e.title?.toLowerCase().includes(q));
+  for (const entry of filtered.slice(0, 100)) {
+    const item = el("div", { className: "history-item" },
+      el("span", { className: "history-title", textContent: entry.title || entry.url }),
+      el("span", { className: "history-url", textContent: entry.url }),
+      el("span", { className: "history-time", textContent: new Date(entry.timestamp).toLocaleString() }),
+    );
+    item.onclick = () => { navigate(entry.url); $("historyPanel").hidden = true; };
+    list.append(item);
+  }
+}
+
+$("historyBtn").onclick = openHistory;
+$("historyClose").onclick = () => { $("historyPanel").hidden = true; };
+$("historyClear").onclick = async () => {
+  const t = state.tabs.find(t => t.id === state.activeTab);
+  if (t) { await window.api.clearHistory(t.sessionId); renderHistory(); }
+};
+$("historySearch").oninput = (e) => renderHistory(e.target.value);
+
+// ── export / import identity ─────────────────────────────────────────────
+$("importBtn").onclick = async () => {
+  const result = await window.api.importIdentity();
+  if (result) {
+    state.sessions.push(result);
+    renderSidebar();
+    openTab(result.id);
+  }
+};
+
+// ── native menu bar handlers ─────────────────────────────────────────────
+window.api.onMenu("menu:new-tab", () => {
+  const sid = state.tabs.find(t => t.id === state.activeTab)?.sessionId ?? state.sessions[0]?.id;
+  if (sid) openTab(sid);
+});
+window.api.onMenu("menu:new-identity", () => openSessionModal());
+window.api.onMenu("menu:close-tab", () => { if (state.activeTab) closeTab(state.activeTab); });
+window.api.onMenu("menu:find", () => openFind());
+window.api.onMenu("menu:reload", () => state.tabs.find(t => t.id === state.activeTab)?.webview.reload());
+window.api.onMenu("menu:toggle-sidebar", () => $("sidebarToggle").click());
+
+// ── find-in-page ────────────────────────────────────────────────────────
+function openFind() {
+  $("findBar").hidden = false;
+  $("findInput").value = "";
+  $("findCount").textContent = "";
+  $("findInput").focus();
+}
+
+function closeFind() {
+  $("findBar").hidden = true;
+  $("findInput").value = "";
+  $("findCount").textContent = "";
+  const t = state.tabs.find(t => t.id === state.activeTab);
+  if (t) t.webview.stopFindInPage("clearSelection");
+}
+
+function doFind(forward = true) {
+  const query = $("findInput").value;
+  if (!query) return;
+  const t = state.tabs.find(t => t.id === state.activeTab);
+  if (!t) return;
+  t.webview.findInPage(query, { forward, findNext: true });
+}
+
+$("findInput").addEventListener("input", () => doFind());
+$("findInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { doFind(!e.shiftKey); e.preventDefault(); }
+  if (e.key === "Escape") closeFind();
+});
+$("findNext").onclick = () => doFind(true);
+$("findPrev").onclick = () => doFind(false);
+$("findClose").onclick = closeFind;
+
+// Cmd+F / Ctrl+F
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f") {
+    e.preventDefault();
+    openFind();
   }
 });
 

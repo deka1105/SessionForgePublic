@@ -1,7 +1,7 @@
 {
   "name": "sessionforge-browser",
   "productName": "SessionForge",
-  "version": "4.0.0",
+  "version": "5.0.0-beta.1",
   "description": "A custom browser where every tab can be its own login session — log in to the same site as multiple users simultaneously.",
   "main": "main.js",
   "scripts": {

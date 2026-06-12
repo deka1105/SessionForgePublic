@@ -10,7 +10,7 @@
 // userData/Partitions/<id>, which gives us full isolation between sessions
 // even when they're loading the same URL.
 
-const { app, BrowserWindow, ipcMain, session, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, session, dialog, Menu } = require("electron");
 const path = require("node:path");
 const fs   = require("node:fs");
 
@@ -88,6 +88,149 @@ ipcMain.handle("sessions:clear", async (_e, id) => {
   const part = session.fromPartition(`persist:${id}`);
   await part.clearStorageData();
   return true;
+});
+
+// ─── Bookmarks (per-identity) ────────────────────────────────────────────
+const bookmarksFile = () => path.join(app.getPath("userData"), "bookmarks.json");
+
+function loadBookmarks() {
+  try { return JSON.parse(fs.readFileSync(bookmarksFile(), "utf8")); }
+  catch { return {}; }
+}
+function saveBookmarks(data) {
+  fs.writeFileSync(bookmarksFile(), JSON.stringify(data, null, 2));
+}
+
+ipcMain.handle("bookmarks:get", (_e, sessionId) => {
+  const all = loadBookmarks();
+  return all[sessionId] || [];
+});
+
+ipcMain.handle("bookmarks:add", (_e, sessionId, bookmark) => {
+  const all = loadBookmarks();
+  if (!all[sessionId]) all[sessionId] = [];
+  bookmark.id = Date.now().toString(36);
+  bookmark.created = new Date().toISOString();
+  all[sessionId].push(bookmark);
+  saveBookmarks(all);
+  return bookmark;
+});
+
+ipcMain.handle("bookmarks:remove", (_e, sessionId, bookmarkId) => {
+  const all = loadBookmarks();
+  if (all[sessionId]) {
+    all[sessionId] = all[sessionId].filter(b => b.id !== bookmarkId);
+    saveBookmarks(all);
+  }
+  return true;
+});
+
+ipcMain.handle("bookmarks:all", () => loadBookmarks());
+
+// ─── Per-identity history ────────────────────────────────────────────────
+const historyFile = () => path.join(app.getPath("userData"), "history.json");
+
+function loadHistory() {
+  try { return JSON.parse(fs.readFileSync(historyFile(), "utf8")); }
+  catch { return {}; }
+}
+function saveHistory(data) {
+  fs.writeFileSync(historyFile(), JSON.stringify(data, null, 2));
+}
+
+ipcMain.handle("history:add", (_e, sessionId, entry) => {
+  const all = loadHistory();
+  if (!all[sessionId]) all[sessionId] = [];
+  entry.timestamp = new Date().toISOString();
+  all[sessionId].unshift(entry);
+  if (all[sessionId].length > 500) all[sessionId] = all[sessionId].slice(0, 500);
+  saveHistory(all);
+  return true;
+});
+
+ipcMain.handle("history:get", (_e, sessionId) => {
+  const all = loadHistory();
+  return all[sessionId] || [];
+});
+
+ipcMain.handle("history:clear", (_e, sessionId) => {
+  const all = loadHistory();
+  all[sessionId] = [];
+  saveHistory(all);
+  return true;
+});
+
+// ─── Export / Import identity ────────────────────────────────────────────
+ipcMain.handle("identity:export", async (_e, sessionId) => {
+  const win = BrowserWindow.getFocusedWindow();
+  const sessions = loadSessions();
+  const identity = sessions.find(s => s.id === sessionId);
+  if (!identity) return null;
+
+  const bookmarks = loadBookmarks()[sessionId] || [];
+  const history = loadHistory()[sessionId] || [];
+
+  const part = session.fromPartition(`persist:${sessionId}`);
+  const cookies = await part.cookies.get({});
+
+  const bundle = { identity, bookmarks, history, cookies };
+
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    title: "Export Identity",
+    defaultPath: `${identity.name.replace(/[^a-z0-9]/gi, "_")}-identity.json`,
+    filters: [{ name: "SessionForge Identity", extensions: ["json"] }],
+  });
+  if (canceled || !filePath) return null;
+  fs.writeFileSync(filePath, JSON.stringify(bundle, null, 2));
+  return filePath;
+});
+
+ipcMain.handle("identity:import", async () => {
+  const win = BrowserWindow.getFocusedWindow();
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    title: "Import Identity",
+    filters: [{ name: "SessionForge Identity", extensions: ["json"] }],
+    properties: ["openFile"],
+  });
+  if (canceled || !filePaths.length) return null;
+
+  const raw = JSON.parse(fs.readFileSync(filePaths[0], "utf8"));
+  if (!raw.identity) return null;
+
+  const newId = raw.identity.id + "_" + Date.now().toString(36).slice(-4);
+  const newIdentity = { ...raw.identity, id: newId, name: raw.identity.name + " (imported)" };
+
+  // Save identity
+  const sessions = loadSessions();
+  sessions.push(newIdentity);
+  saveSessions(sessions);
+
+  // Restore bookmarks
+  if (raw.bookmarks?.length) {
+    const allBm = loadBookmarks();
+    allBm[newId] = raw.bookmarks;
+    saveBookmarks(allBm);
+  }
+
+  // Restore history
+  if (raw.history?.length) {
+    const allHist = loadHistory();
+    allHist[newId] = raw.history;
+    saveHistory(allHist);
+  }
+
+  // Restore cookies
+  if (raw.cookies?.length) {
+    const part = session.fromPartition(`persist:${newId}`);
+    for (const cookie of raw.cookies) {
+      try {
+        const url = `http${cookie.secure ? "s" : ""}://${cookie.domain?.replace(/^\./, "")}${cookie.path || "/"}`;
+        await part.cookies.set({ ...cookie, url });
+      } catch { /* skip invalid cookies */ }
+    }
+  }
+
+  return newIdentity;
 });
 
 // ─── Automation: input simulation via webContents ────────────────────────
@@ -175,12 +318,81 @@ ipcMain.handle("automation:delete-script", (_e, filename) => {
   return true;
 });
 
+// ─── Native menu bar ─────────────────────────────────────────────────────
+function buildMenu() {
+  const isMac = process.platform === "darwin";
+  const template = [
+    ...(isMac ? [{
+      label: "SessionForge",
+      submenu: [
+        { role: "about" },
+        { type: "separator" },
+        { role: "hide" },
+        { role: "hideOthers" },
+        { role: "unhide" },
+        { type: "separator" },
+        { role: "quit" },
+      ],
+    }] : []),
+    {
+      label: "File",
+      submenu: [
+        { label: "New Tab", accelerator: "CmdOrCtrl+T", click: () => sendToRenderer("menu:new-tab") },
+        { label: "New Identity", accelerator: "CmdOrCtrl+N", click: () => sendToRenderer("menu:new-identity") },
+        { type: "separator" },
+        { label: "Close Tab", accelerator: "CmdOrCtrl+W", click: () => sendToRenderer("menu:close-tab") },
+        { type: "separator" },
+        ...(isMac ? [] : [{ role: "quit" }]),
+      ],
+    },
+    {
+      label: "Edit",
+      submenu: [
+        { role: "undo" },
+        { role: "redo" },
+        { type: "separator" },
+        { role: "cut" },
+        { role: "copy" },
+        { role: "paste" },
+        { role: "selectAll" },
+        { type: "separator" },
+        { label: "Find…", accelerator: "CmdOrCtrl+F", click: () => sendToRenderer("menu:find") },
+      ],
+    },
+    {
+      label: "View",
+      submenu: [
+        { label: "Reload Page", accelerator: "CmdOrCtrl+R", click: () => sendToRenderer("menu:reload") },
+        { type: "separator" },
+        { role: "togglefullscreen" },
+        { label: "Toggle Sidebar", accelerator: "CmdOrCtrl+B", click: () => sendToRenderer("menu:toggle-sidebar") },
+        { label: "Toggle DevTools", accelerator: "CmdOrCtrl+Shift+I", role: "toggleDevTools" },
+      ],
+    },
+    {
+      label: "Window",
+      submenu: [
+        { role: "minimize" },
+        { role: "zoom" },
+        ...(isMac ? [{ type: "separator" }, { role: "front" }] : [{ role: "close" }]),
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+function sendToRenderer(channel) {
+  const win = BrowserWindow.getFocusedWindow();
+  if (win) win.webContents.send(channel);
+}
+
 // ─── App lifecycle ────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   // Replace the Electron-default dock icon with ours (macOS only).
   if (process.platform === "darwin" && app.dock) {
     app.dock.setIcon(path.join(__dirname, "assets", "icon.png"));
   }
+  buildMenu();
   createWindow();
 });
 

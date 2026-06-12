@@ -26,6 +26,10 @@
 
     <ul id="sessionList"></ul>
 
+    <div class="sidebar-actions">
+      <button id="importBtn" class="sidebar-action-btn" title="Import an identity from file">↓ Import</button>
+    </div>
+
     <footer class="hint">
       Click an identity to switch to its tabs. Each identity has its own
       cookies — log in to the same site as different users in parallel.
@@ -49,8 +53,33 @@
       <button id="reloadBtn"  title="Reload">↻</button>
       <span id="sessionChip" class="chip"></span>
       <input id="urlInput" type="text" placeholder="Enter URL or search" spellcheck="false">
+      <button id="bookmarkBtn" title="Bookmark this page (⌘D)">☆</button>
       <button id="cloneBtn" title="Open this URL in a new identity">⎘ Clone</button>
+      <button id="historyBtn" title="View history for this identity">⏱</button>
       <button id="automationBtn" title="Open Automation panel (⌘⇧A)">⚡ Auto</button>
+    </div>
+
+    <!-- Bookmarks bar (per-identity) -->
+    <div id="bookmarksBar" class="bookmarks-bar"></div>
+
+    <!-- History panel (slides in from right, inside main) -->
+    <div id="historyPanel" class="history-panel" hidden>
+      <div class="history-header">
+        <h4>History</h4>
+        <button id="historyClear" class="history-clear-btn">Clear</button>
+        <button id="historyClose" class="history-close-btn">×</button>
+      </div>
+      <input id="historySearch" class="history-search" type="text" placeholder="Search history…">
+      <div id="historyList" class="history-list"></div>
+    </div>
+
+    <!-- Find-in-page bar -->
+    <div id="findBar" class="find-bar" hidden>
+      <input id="findInput" type="text" placeholder="Find in page…" spellcheck="false">
+      <span id="findCount" class="find-count"></span>
+      <button id="findPrev" class="find-nav" title="Previous">‹</button>
+      <button id="findNext" class="find-nav" title="Next">›</button>
+      <button id="findClose" class="find-close" title="Close (Esc)">×</button>
     </div>
 
     <!-- Webview host: one <webview> per tab, only the active one is shown.

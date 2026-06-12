@@ -108,18 +108,19 @@ The only Node-side surface it gets is `window.api` from `preload.js`.
 | Visual element picker                                         | ✅     |
 | Cosmetic polish (focus rings, transitions, terminal log)      | ✅     |
 
-## Version 5X-Beta (next)
+## Version 5X-Beta (in progress)
 
 | Feature                                                       | Status |
 |---------------------------------------------------------------|--------|
-| Bookmarks (per-identity bookmark bar)                         | ⏳     |
-| Find-in-page (Ctrl+F / Cmd+F)                                | ⏳     |
-| Per-identity browsing history (searchable)                    | ⏳     |
-| Export / import identity (cookie + bookmark bundle)           | ⏳     |
-| Identity groups ("Work" / "Personal" collapsible folders)     | ⏳     |
-| Drag-tab-onto-identity to rebind                              | ⏳     |
-| Native menu bar (File / Edit / Window with shortcuts)         | ⏳     |
-| Identity-coloured tab borders                                 | ⏳     |
+| Bookmarks (per-identity bookmark bar)                         | ✅     |
+| Find-in-page (Ctrl+F / Cmd+F)                                | ✅     |
+| Per-identity browsing history (searchable)                    | ✅     |
+| Export / import identity (cookie + bookmark bundle)           | ✅     |
+| Drag-tab-onto-identity to rebind                              | ✅     |
+| Native menu bar (File / Edit / Window with shortcuts)         | ✅     |
+| Identity-coloured tab borders                                 | ✅     |
+| Multi-Run scheduling (schedule parallel identity runs)        | ⏳     |
+| Identity tree (collapsible folder hierarchy in sidebar)       | ⏳     |
 | Auto-update via Squirrel                                      | ⏳     |
 | Script marketplace (share/import community scripts)           | ⏳     |
 | Conditional automation (if element exists → do X, else Y)    | ⏳     |
