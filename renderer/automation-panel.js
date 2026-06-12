@@ -9,16 +9,147 @@ const automationPanel = (() => {
   let isRunning = false;
 
   const ACTION_DEFS = [
-    { action: "click",            label: "Click",             fields: [{ key: "selector", label: "CSS Selector", placeholder: "#btn-login" }, { key: "x", label: "X (optional)", type: "number" }, { key: "y", label: "Y (optional)", type: "number" }] },
-    { action: "type",             label: "Type Text",         fields: [{ key: "selector", label: "CSS Selector", placeholder: "input[name=email]" }, { key: "text", label: "Text to type" }] },
+    { action: "click",            label: "Click",             fields: [{ key: "selector", label: "Element", placeholder: "Click 🎯 Pick to select", picker: true }, { key: "x", label: "X (optional)", type: "number" }, { key: "y", label: "Y (optional)", type: "number" }] },
+    { action: "type",             label: "Type Text",         fields: [{ key: "selector", label: "Element", placeholder: "Click 🎯 Pick to select", picker: true }, { key: "text", label: "Text to type" }] },
     { action: "keystroke",        label: "Keystroke",         fields: [{ key: "keys", label: "Keys", placeholder: "Ctrl+A, Enter, Tab" }] },
     { action: "navigate",         label: "Navigate",          fields: [{ key: "url", label: "URL", placeholder: "https://example.com" }] },
     { action: "wait",             label: "Wait",              fields: [{ key: "ms", label: "Milliseconds", type: "number", placeholder: "1000" }] },
-    { action: "waitForSelector",  label: "Wait for Element",  fields: [{ key: "selector", label: "CSS Selector" }, { key: "timeout", label: "Timeout (ms)", type: "number", placeholder: "10000" }] },
+    { action: "waitForSelector",  label: "Wait for Element",  fields: [{ key: "selector", label: "Element", placeholder: "Click 🎯 Pick to select", picker: true }, { key: "timeout", label: "Timeout (ms)", type: "number", placeholder: "10000" }] },
     { action: "screenshot",       label: "Screenshot",        fields: [] },
     { action: "printPdf",         label: "Print to PDF",      fields: [] },
     { action: "scrollTo",         label: "Scroll To",         fields: [{ key: "x", label: "X", type: "number", placeholder: "0" }, { key: "y", label: "Y", type: "number", placeholder: "500" }] },
   ];
+
+  // ── Element Picker ─────────────────────────────────────────────────────
+  // Injects a visual picker into the active webview. User clicks an element
+  // and we compute a readable, unique selector for it.
+  let pickerCallback = null;
+
+  function startPicker(onPicked) {
+    const tab = state.tabs.find(t => t.id === state.activeTab);
+    if (!tab) return;
+    const wv = tab.webview;
+    pickerCallback = onPicked;
+
+    // Inject picker overlay into the webview
+    wv.executeJavaScript(`
+      (() => {
+        if (window.__sfPickerActive) return;
+        window.__sfPickerActive = true;
+
+        const overlay = document.createElement('div');
+        overlay.id = '__sf_picker_overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;cursor:crosshair;';
+        document.body.appendChild(overlay);
+
+        const highlight = document.createElement('div');
+        highlight.id = '__sf_picker_highlight';
+        highlight.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483646;border:2px solid #6ea8ff;background:rgba(110,168,255,.15);border-radius:3px;transition:all .05s;display:none;';
+        document.body.appendChild(highlight);
+
+        const label = document.createElement('div');
+        label.id = '__sf_picker_label';
+        label.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;background:#0f1115;color:#e7ecf3;font:11px monospace;padding:3px 7px;border-radius:4px;white-space:nowrap;display:none;';
+        document.body.appendChild(label);
+
+        function bestSelector(el) {
+          if (el.id) return '#' + CSS.escape(el.id);
+          // Try unique attribute selectors
+          for (const attr of ['name', 'data-testid', 'aria-label', 'placeholder', 'type']) {
+            const val = el.getAttribute(attr);
+            if (val) {
+              const sel = el.tagName.toLowerCase() + '[' + attr + '=' + JSON.stringify(val) + ']';
+              if (document.querySelectorAll(sel).length === 1) return sel;
+            }
+          }
+          // nth-child path (last resort but always unique)
+          const parts = [];
+          let node = el;
+          while (node && node !== document.body) {
+            const parent = node.parentElement;
+            if (!parent) break;
+            const siblings = [...parent.children].filter(c => c.tagName === node.tagName);
+            if (siblings.length > 1) {
+              const idx = siblings.indexOf(node) + 1;
+              parts.unshift(node.tagName.toLowerCase() + ':nth-of-type(' + idx + ')');
+            } else {
+              parts.unshift(node.tagName.toLowerCase());
+            }
+            node = parent;
+            // Stop early if unique
+            const candidate = parts.join(' > ');
+            if (document.querySelectorAll(candidate).length === 1) return candidate;
+          }
+          return parts.join(' > ');
+        }
+
+        function describeEl(el) {
+          let desc = el.tagName.toLowerCase();
+          if (el.id) desc += '#' + el.id;
+          else if (el.className && typeof el.className === 'string') desc += '.' + el.className.trim().split(/\\s+/).slice(0,2).join('.');
+          const text = (el.textContent || '').trim().slice(0, 30);
+          if (text) desc += ' "' + text + '"';
+          return desc;
+        }
+
+        overlay.addEventListener('mousemove', (e) => {
+          overlay.style.pointerEvents = 'none';
+          const target = document.elementFromPoint(e.clientX, e.clientY);
+          overlay.style.pointerEvents = '';
+          if (!target || target === overlay || target === highlight) return;
+          const rect = target.getBoundingClientRect();
+          highlight.style.display = 'block';
+          highlight.style.top = rect.top + 'px';
+          highlight.style.left = rect.left + 'px';
+          highlight.style.width = rect.width + 'px';
+          highlight.style.height = rect.height + 'px';
+          label.style.display = 'block';
+          label.style.top = Math.max(0, rect.top - 22) + 'px';
+          label.style.left = rect.left + 'px';
+          label.textContent = describeEl(target);
+        });
+
+        overlay.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          overlay.style.pointerEvents = 'none';
+          const target = document.elementFromPoint(e.clientX, e.clientY);
+          overlay.style.pointerEvents = '';
+          const selector = bestSelector(target);
+          // Cleanup
+          overlay.remove();
+          highlight.remove();
+          label.remove();
+          window.__sfPickerActive = false;
+          // Return result via console (captured by host)
+          window.__sfPickerResult = selector;
+        });
+
+        // ESC to cancel
+        document.addEventListener('keydown', function esc(e) {
+          if (e.key === 'Escape') {
+            overlay.remove(); highlight.remove(); label.remove();
+            window.__sfPickerActive = false;
+            window.__sfPickerResult = '';
+            document.removeEventListener('keydown', esc);
+          }
+        });
+      })()
+    `);
+
+    // Poll for result (webview doesn't have direct callback channel to renderer)
+    const poll = setInterval(async () => {
+      try {
+        const result = await wv.executeJavaScript(`window.__sfPickerResult`);
+        if (result !== undefined) {
+          clearInterval(poll);
+          await wv.executeJavaScript(`delete window.__sfPickerResult`);
+          if (pickerCallback && result) pickerCallback(result);
+          pickerCallback = null;
+        }
+      } catch { /* webview navigated or closed — stop polling */ clearInterval(poll); }
+    }, 200);
+  }
 
   function create() {
     panelEl = document.createElement("aside");
@@ -83,9 +214,15 @@ const automationPanel = (() => {
       let fieldsHtml = "";
       def.fields.forEach(f => {
         const val = step.params[f.key] ?? "";
+        const pickerBtn = f.picker
+          ? `<button class="auto-pick-btn" data-step="${i}" data-key="${f.key}" title="Pick element visually">🎯 Pick</button>`
+          : "";
         fieldsHtml += `<label class="auto-field-label">${f.label}
-          <input class="auto-field" data-key="${f.key}" type="${f.type || "text"}"
-                 value="${val}" placeholder="${f.placeholder || ""}">
+          <span class="auto-field-row">
+            <input class="auto-field" data-key="${f.key}" type="${f.type || "text"}"
+                   value="${val}" placeholder="${f.placeholder || ""}">
+            ${pickerBtn}
+          </span>
         </label>`;
       });
 
@@ -110,6 +247,20 @@ const automationPanel = (() => {
         input.oninput = () => {
           const key = input.dataset.key;
           step.params[key] = input.type === "number" ? Number(input.value) : input.value;
+        };
+      });
+
+      // Picker buttons
+      stepEl.querySelectorAll(".auto-pick-btn").forEach(btn => {
+        btn.onclick = () => {
+          const stepIdx = Number(btn.dataset.step);
+          const key = btn.dataset.key;
+          btn.textContent = "⏳ Picking…";
+          startPicker((selector) => {
+            currentSteps[stepIdx].params[key] = selector;
+            renderSteps();
+            log(`Picked: ${selector}`, "success");
+          });
         };
       });
 
