@@ -149,13 +149,38 @@ function renderSidebar() {
       const tabList = el("ul", { className: "tree-tabs" });
       for (const t of identityTabs) {
         const isActive = t.id === state.activeTab;
-        const hasSchedule = state.tabSchedules?.[t.id];
+        const sched = state.tabSchedules?.[t.id];
+
+        // Build schedule badge with icon, tooltip, and countdown
+        const schedBadgeElements = [];
+        if (sched) {
+          const isRunning = sched.status === "running";
+          let icon = isRunning ? "⏳" : "🕐";
+          let tooltip = `${sched.scriptName} — ${isRunning ? "Running…" : sched.schedInput}`;
+          let countdownText = "";
+
+          if (!isRunning && sched.nextRunAt) {
+            const remaining = Math.max(0, Math.round((sched.nextRunAt - Date.now()) / 1000));
+            if (remaining <= 60 && remaining > 0) {
+              countdownText = `${remaining}s`;
+              tooltip = `${sched.scriptName} — in ${remaining}s`;
+            }
+          }
+
+          const badge = el("span", {
+            className: "tree-tab-sched-badge" + (isRunning ? " running" : ""),
+            textContent: icon + (countdownText ? " " + countdownText : ""),
+            title: tooltip,
+          });
+          schedBadgeElements.push(badge);
+        }
+
         const tabItem = el("li", {
           className: "tree-tab" + (isActive ? " active" : ""),
           title: t.url,
         },
           el("span", { className: "tree-tab-title", textContent: t.title || t.url.slice(0, 25) }),
-          ...(hasSchedule ? [el("span", { className: "tree-tab-sched-badge", textContent: "⏰" })] : []),
+          ...schedBadgeElements,
           el("button", { className: "tree-tab-sched", title: "Schedule script on this tab", textContent: "⏰",
             onclick: (e) => { e.stopPropagation(); openTabSchedule(t.id, s.id); }
           }),
@@ -176,6 +201,11 @@ function renderSidebar() {
 // Per-tab scheduling state: { [tabId]: { scriptName, schedule, timer } }
 if (!state.sidebarExpanded) state.sidebarExpanded = {};
 if (!state.tabSchedules) state.tabSchedules = {};
+
+// Refresh sidebar every second when schedules are active (for countdown display)
+setInterval(() => {
+  if (Object.keys(state.tabSchedules).length > 0) renderSidebar();
+}, 1000);
 
 async function openTabSchedule(tabId, sessionId) {
   const scripts = await window.api.listScripts();
@@ -252,28 +282,22 @@ function scheduleOnTab(tabId, sessionId, script, schedInput) {
 }
 
 function parseScheduleStr(input) {
-  if (!input) return null;
-  const v = input.trim().toLowerCase();
-  let m = v.match(/^in\s+(\d+)\s*(s(?:ec)?|m(?:in)?|h(?:r|our)?)\w*$/);
-  if (m) return { type: "once", delay: parseInt(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2][0]] };
-  m = v.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/);
+  let m = input.match(/^in\s+(\d+)\s*(s|m|h)$/i);
+  if (m) return { type: "once", delay: parseInt(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2].toLowerCase()] };
+  m = input.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
   if (m) {
     let h = parseInt(m[1]); const min = parseInt(m[2]);
-    if (m[3] === "pm" && h < 12) h += 12;
-    if (m[3] === "am" && h === 12) h = 0;
+    if (m[3]?.toLowerCase() === "pm" && h < 12) h += 12;
+    if (m[3]?.toLowerCase() === "am" && h === 12) h = 0;
     const now = new Date();
     const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, min);
     if (target <= now) target.setDate(target.getDate() + 1);
     return { type: "once", delay: target - now };
   }
-  m = v.match(/^every\s+(\d+)\s*(s(?:ec)?|m(?:in)?|h(?:r|our)?)\w*$/);
-  if (m) return { type: "recurring", interval: parseInt(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2][0]] };
-  m = v.match(/^every\s+day\s+at\s+(\d{1,2}):(\d{2})$/);
+  m = input.match(/^every\s+(\d+)\s*(s|m|h)$/i);
+  if (m) return { type: "recurring", interval: parseInt(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2].toLowerCase()] };
+  m = input.match(/^every\s+day\s+at\s+(\d{1,2}):(\d{2})$/i);
   if (m) return { type: "daily", hours: parseInt(m[1]), minutes: parseInt(m[2]) };
-  m = v.match(/^(\d+)\s*(s(?:ec)?|m(?:in)?|h(?:r|our)?)\w*$/);
-  if (m) return { type: "recurring", interval: parseInt(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2][0]] };
-  m = v.match(/^(\d+)$/);
-  if (m) return { type: "recurring", interval: parseInt(m[1]) * 60000 };
   return null;
 }
 

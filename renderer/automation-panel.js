@@ -68,7 +68,7 @@ const automationPanel = (() => {
         <button class="auto-btn auto-load" title="Load script">📂 Load</button>
         <button class="auto-btn auto-schedule" title="Schedule this script">⏰</button>
         <button class="auto-btn auto-multi" title="Run scripts on multiple identities">⚡ Multi</button>
-        <button class="auto-btn auto-history" title="View run history with screenshots">📜</button>
+        <button class="auto-btn auto-history" title="Run history">📜</button>
       </div>
       <div class="auto-steps"></div>
       <div class="auto-add-step">
@@ -239,15 +239,11 @@ const automationPanel = (() => {
     if (!input) return null;
     const v = input.trim().toLowerCase();
 
-    // "in 5m" / "in 30s" / "in 2h" / "in 5 min" / "in 5 minutes"
+    // "in 5m" / "in 30s" / "in 2h" / "in 5 min"
     let m = v.match(/^in\s+(\d+)\s*(s(?:ec)?|m(?:in)?|h(?:r|our)?)\w*$/);
-    if (m) {
-      const unit = m[2][0]; // first char: s, m, or h
-      const mult = { s: 1000, m: 60000, h: 3600000 };
-      return { type: "once", delay: parseInt(m[1]) * mult[unit] };
-    }
+    if (m) return { type: "once", delay: parseInt(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2][0]] };
 
-    // "15:30" or "3:00 PM" or "3:00pm"
+    // "15:30" or "3:00pm"
     m = v.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/);
     if (m) {
       let h = parseInt(m[1]); const min = parseInt(m[2]);
@@ -259,27 +255,19 @@ const automationPanel = (() => {
       return { type: "once", delay: target - now };
     }
 
-    // "every 10m" / "every 5 min" / "every 1h" / "every 30s" / "every 10 minutes"
+    // "every 10m" / "every 5 min"
     m = v.match(/^every\s+(\d+)\s*(s(?:ec)?|m(?:in)?|h(?:r|our)?)\w*$/);
-    if (m) {
-      const unit = m[2][0];
-      const mult = { s: 1000, m: 60000, h: 3600000 };
-      return { type: "recurring", interval: parseInt(m[1]) * mult[unit] };
-    }
+    if (m) return { type: "recurring", interval: parseInt(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2][0]] };
 
     // "every day at 09:00"
     m = v.match(/^every\s+day\s+at\s+(\d{1,2}):(\d{2})$/);
     if (m) return { type: "daily", hours: parseInt(m[1]), minutes: parseInt(m[2]) };
 
-    // Bare duration: "10m", "5min", "30s", "1h" → recurring
+    // Bare duration: "1m", "5min", "30s", "2h" → recurring
     m = v.match(/^(\d+)\s*(s(?:ec)?|m(?:in)?|h(?:r|our)?)\w*$/);
-    if (m) {
-      const unit = m[2][0];
-      const mult = { s: 1000, m: 60000, h: 3600000 };
-      return { type: "recurring", interval: parseInt(m[1]) * mult[unit] };
-    }
+    if (m) return { type: "recurring", interval: parseInt(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2][0]] };
 
-    // Simple number assumed as minutes: "10" → every 10m
+    // Plain number: "10" → every 10 minutes
     m = v.match(/^(\d+)$/);
     if (m) return { type: "recurring", interval: parseInt(m[1]) * 60000 };
 
@@ -418,8 +406,9 @@ const automationPanel = (() => {
     logEl.scrollTop = logEl.scrollHeight;
   }
 
-  // ── Run History (before/after screenshots) ─────────────────────────────
-  const runHistory = []; // [{timestamp, identity, tab, script, schedule, beforeImg, afterImg}]
+  // ── Run History ────────────────────────────────────────────────────────
+  const runHistory = []; // [{timestamp, identity, tab, script, status, schedInput}]
+  let lastUsedScript = "";
 
   function showRunHistory() {
     if (!panelEl) return;
@@ -428,10 +417,7 @@ const automationPanel = (() => {
 
     const panel = document.createElement("div");
     panel.className = "run-history-panel";
-    panel.innerHTML = `
-      <div class="rh-header"><h4>Run History</h4><button class="rh-close">×</button></div>
-      <div class="rh-list"></div>
-    `;
+    panel.innerHTML = `<div class="rh-header"><h4>Run History</h4><button class="rh-close">×</button></div><div class="rh-list"></div>`;
     panel.querySelector(".rh-close").onclick = () => panel.remove();
     panelEl.append(panel);
 
@@ -444,55 +430,17 @@ const automationPanel = (() => {
       const item = document.createElement("div");
       item.className = "rh-item";
       item.innerHTML = `
-        <div class="rh-meta">
-          <span class="rh-status-badge ${statusClass}">${statusIcon}</span>
-          <span class="rh-identity">${run.identity || "?"}</span>
-          <span class="rh-script">${run.script}</span>
-          ${run.schedInput ? `<span class="rh-sched-label">${run.schedInput}</span>` : ""}
-          <span class="rh-time">${new Date(run.timestamp).toLocaleString()}</span>
-        </div>
-        ${(run.beforeImg || run.afterImg) ? `<div class="rh-thumbs">
-          ${run.beforeImg ? `<img class="rh-thumb" src="${run.beforeImg}" title="Before">` : '<span class="rh-no-img">—</span>'}
-          <span class="rh-arrow">→</span>
-          ${run.afterImg ? `<img class="rh-thumb" src="${run.afterImg}" title="After">` : '<span class="rh-no-img">pending</span>'}
-        </div>` : ""}
+        <span class="rh-status-badge ${statusClass}">${statusIcon}</span>
+        <span class="rh-identity">${run.identity || "?"}</span>
+        <span class="rh-script">${run.script}</span>
+        ${run.schedInput ? `<span class="rh-sched-label">${run.schedInput}</span>` : ""}
+        <span class="rh-time">${new Date(run.timestamp).toLocaleTimeString()}</span>
       `;
-      item.querySelectorAll(".rh-thumb").forEach(img => {
-        img.onclick = (e) => {
-          e.stopPropagation();
-          showFullScreenshot(img.src, img.title);
-        };
-      });
       list.append(item);
     }
   }
 
-  function showFullScreenshot(src, title) {
-    const overlay = document.createElement("div");
-    overlay.className = "auto-prompt-overlay";
-    overlay.style.cursor = "zoom-out";
-    overlay.innerHTML = `
-      <div style="max-width:90vw;max-height:90vh;position:relative;">
-        <div style="color:var(--text);font-size:12px;margin-bottom:8px;">${title}</div>
-        <img src="${src}" style="max-width:100%;max-height:85vh;border-radius:8px;border:1px solid var(--border);">
-      </div>
-    `;
-    overlay.onclick = () => overlay.remove();
-    document.body.append(overlay);
-  }
-
-  async function captureScreenshot(wv) {
-    try {
-      if (!wv) return null;
-      // capturePage() only works safely on the active webview in this Electron version
-      if (!wv.classList.contains("active")) return null;
-      const image = await wv.capturePage();
-      if (!image || image.isEmpty()) return null;
-      return "data:image/png;base64," + image.toPNG().toString("base64");
-    } catch { return null; }
-  }
-
-  // ── Multi-Run: Identity → Tab → Script → Schedule ─────────────────────
+  // ── Multi-Run: Identity → Tab → Script → Schedule per row ─────────────
   async function openMultiRun() {
     const scripts = await window.api.listScripts();
     if (!scripts.length) { log("Save some scripts first", "warn"); return; }
@@ -500,27 +448,35 @@ const automationPanel = (() => {
     const overlay = document.createElement("div");
     overlay.className = "auto-prompt-overlay";
 
-    const scriptOptions = scripts.map(sc => `<option value="${sc.filename}">${sc.name}</option>`).join("");
+    const scriptOptions = scripts.map(sc =>
+      `<option value="${sc.filename}" ${sc.filename === lastUsedScript ? "selected" : ""}>${sc.name}</option>`
+    ).join("");
 
-    const identityRows = state.sessions.map(s => {
+    // Only show identities that have open tabs
+    const identitiesWithTabs = state.sessions.filter(s => state.tabs.some(t => t.sessionId === s.id));
+    if (!identitiesWithTabs.length) { log("No open tabs in any identity", "warn"); return; }
+
+    const identityRows = identitiesWithTabs.map(s => {
       const identityTabs = state.tabs.filter(t => t.sessionId === s.id);
       const tabOptions = identityTabs.map(t =>
         `<option value="${t.id}">${(t.title || t.url).slice(0, 30)}</option>`
       ).join("");
+      // Pre-select if only 1 tab
+      const preSelected = identityTabs.length === 1;
 
       return `
         <div class="multi-row" data-session="${s.id}">
           <span class="multi-dot" style="background:${s.color}"></span>
           <span class="multi-name">${s.name}</span>
-          <select class="multi-tab-select" data-session="${s.id}" title="Tab">
-            <option value="">Tab…</option>
+          <select class="multi-tab-select" data-session="${s.id}">
+            ${preSelected ? "" : '<option value="">Tab…</option>'}
             ${tabOptions}
           </select>
-          <select class="multi-script-select" data-session="${s.id}" title="Script">
+          <select class="multi-script-select" data-session="${s.id}">
             <option value="">Script…</option>
             ${scriptOptions}
           </select>
-          <input class="multi-sched-input" placeholder="now" title="Schedule" data-session="${s.id}">
+          <input class="multi-sched-input" placeholder="now" title="Schedule (1m, every 5m, 15:30)">
           <button class="multi-remove" title="Remove">×</button>
         </div>
       `;
@@ -533,48 +489,38 @@ const automationPanel = (() => {
       return `<div class="multi-active-sched">
         <span class="multi-dot" style="background:${identity?.color || '#888'}"></span>
         <span>${identity?.name || "?"} → ${(tab?.title || "").slice(0,20)} → ${sched.scriptName} (${sched.schedInput})</span>
-        <button class="multi-cancel-sched" data-tab="${tabId}" title="Cancel">×</button>
+        <button class="multi-cancel-sched" data-tab="${tabId}">×</button>
       </div>`;
     }).join("");
 
     overlay.innerHTML = `
-      <div class="auto-prompt-box" style="width:560px;">
+      <div class="auto-prompt-box" style="width:540px;">
         <div class="auto-prompt-title">Multi-Run</div>
-        <div class="multi-col-headers">
-          <span>Identity</span><span>Tab</span><span>Script</span><span>Schedule</span><span></span>
-        </div>
+        <div class="multi-col-headers"><span>Identity</span><span>Tab</span><span>Script</span><span>Schedule</span><span></span></div>
         <div class="multi-list">${identityRows}</div>
         ${activeScheds ? `<div class="multi-active-section"><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:6px;">Active Schedules</label>${activeScheds}</div>` : ""}
         <div class="auto-prompt-actions">
           <button class="auto-prompt-cancel">Cancel</button>
-          <button class="auto-btn" onclick="" id="multi-history-btn">📜 History</button>
+          <button class="auto-btn" id="multi-history-btn">📜 History</button>
           <button class="auto-prompt-ok">Run</button>
         </div>
       </div>
     `;
     document.body.append(overlay);
 
-    // Wire remove
     overlay.querySelectorAll(".multi-remove").forEach(btn => {
       btn.onclick = (e) => { e.stopPropagation(); btn.closest(".multi-row").remove(); };
     });
-
-    // Wire cancel-schedule
     overlay.querySelectorAll(".multi-cancel-sched").forEach(btn => {
       btn.onclick = () => {
         const tabId = btn.dataset.tab;
-        if (state.tabSchedules[tabId]?.timer) {
-          clearInterval(state.tabSchedules[tabId].timer);
-          clearTimeout(state.tabSchedules[tabId].timer);
-        }
+        if (state.tabSchedules[tabId]?.timer) { clearInterval(state.tabSchedules[tabId].timer); clearTimeout(state.tabSchedules[tabId].timer); }
         delete state.tabSchedules[tabId];
         btn.closest(".multi-active-sched").remove();
         renderSidebar();
         log("Schedule cancelled", "info");
       };
     });
-
-    // History button
     overlay.querySelector("#multi-history-btn").onclick = () => { overlay.remove(); showRunHistory(); };
 
     await new Promise((resolve) => {
@@ -586,129 +532,104 @@ const automationPanel = (() => {
           const sessionId = row.dataset.session;
           const tabId = row.querySelector(".multi-tab-select").value;
           const scriptFile = row.querySelector(".multi-script-select").value;
-          const schedInput = row.querySelector(".multi-sched-input").value.trim();
-          if (!scriptFile) continue;
+          const schedInput = row.querySelector(".multi-sched-input").value.trim() || "now";
+          if (!scriptFile || !tabId) continue;
           const script = scripts.find(s => s.filename === scriptFile);
           if (!script?.steps) continue;
-          const tab = tabId ? state.tabs.find(t => t.id === tabId) : state.tabs.find(t => t.sessionId === sessionId);
-          if (!tab) continue;
-          assignments.push({ sessionId, tabId: tab.id, steps: script.steps, scriptName: script.name, schedInput: schedInput || "now" });
+          lastUsedScript = scriptFile;
+          assignments.push({ sessionId, tabId, steps: script.steps, scriptName: script.name, schedInput });
         }
         overlay.remove();
+        if (!assignments.length) { log("No valid assignments", "warn"); resolve(); return; }
 
-        if (!assignments.length) { log("No assignments", "warn"); resolve(); return; }
+        const immediate = assignments.filter(a => a.schedInput === "now");
+        const scheduled = assignments.filter(a => a.schedInput !== "now");
 
-        // Separate immediate vs scheduled
-        const immediate = assignments.filter(a => !a.schedInput || a.schedInput === "now");
-        const scheduled = assignments.filter(a => a.schedInput && a.schedInput !== "now");
-
-        if (immediate.length) await executeMultiRunV2(immediate);
-
-        for (const a of scheduled) {
-          const parsed = parseSchedule(a.schedInput);
-          if (!parsed) { log(`Bad schedule "${a.schedInput}" for ${a.scriptName}`, "error"); continue; }
-
-          // Add to run history as "waiting"
-          const histEntry = { timestamp: Date.now(), identity: state.sessions.find(s => s.id === a.sessionId)?.name, tab: state.tabs.find(t => t.id === a.tabId)?.title, script: a.scriptName, status: "waiting", schedInput: a.schedInput, beforeImg: null, afterImg: null };
-          runHistory.push(histEntry);
-
-          // Store schedule in tabSchedules so sidebar shows badge
-          const runFn = async () => {
-            histEntry.status = "running";
-            await executeMultiRunV2([a]);
-            histEntry.status = "complete";
-            histEntry.timestamp = Date.now();
-          };
-
-          let timer;
-          if (parsed.type === "once") {
-            timer = setTimeout(runFn, parsed.delay);
-            log(`Scheduled: ${a.scriptName} in ${a.schedInput}`, "success");
-          } else if (parsed.type === "recurring") {
-            timer = setInterval(runFn, parsed.interval);
-            log(`Recurring: ${a.scriptName} ${a.schedInput}`, "success");
-          } else if (parsed.type === "daily") {
-            timer = setInterval(() => {
-              const now = new Date();
-              if (now.getHours() === parsed.hours && now.getMinutes() === parsed.minutes && now.getSeconds() < 30) runFn();
-            }, 30000);
-            log(`Daily: ${a.scriptName} at ${a.schedInput}`, "success");
-          }
-
-          state.tabSchedules[a.tabId] = { scriptName: a.scriptName, schedInput: a.schedInput, timer };
-          renderSidebar();
-        }
+        if (immediate.length) await executeMultiRun(immediate);
+        for (const a of scheduled) scheduleTabRun(a);
         resolve();
       };
     });
   }
 
-  async function executeMultiRunV2(assignments) {
+  async function executeMultiRun(assignments) {
     log(`Multi-Run: ${assignments.length} tasks…`, "info");
-
-    const promises = assignments.map(async (a) => {
-      const tab = state.tabs.find(t => t.id === a.tabId);
-      if (!tab) return { ...a, result: "error", error: "Tab not found" };
-      const identity = state.sessions.find(s => s.id === a.sessionId);
-      const wv = tab.webview;
-      if (!wv || !wv.executeJavaScript) return { ...a, result: "error", error: "Webview not ready" };
-
-      // Create history entry as "running"
-      const histEntry = { timestamp: Date.now(), identity: identity?.name, tab: tab.title, script: a.scriptName, status: "running", beforeImg: null, afterImg: null };
+    for (const a of assignments) {
+      const histEntry = { timestamp: Date.now(), identity: state.sessions.find(s => s.id === a.sessionId)?.name, tab: state.tabs.find(t => t.id === a.tabId)?.title, script: a.scriptName, status: "running" };
       runHistory.push(histEntry);
+    }
 
-      // Capture before screenshot
-      histEntry.beforeImg = await captureScreenshot(wv);
-
-      // Run the script
-      try {
-        await automation.runScriptOnWebview(wv, a.steps, (i, step, status, err) => {
-          if (status === "running") log(`[${identity?.name}] Step ${i+1}: ${step.action}…`);
-          else if (status === "error") log(`[${identity?.name}] Step ${i+1}: ${err}`, "error");
-        });
-      } catch (e) {
-        histEntry.status = "error";
-        return { ...a, result: "error", error: e.message };
-      }
-
-      // Wait 5 seconds then capture after screenshot
-      await new Promise(r => setTimeout(r, 5000));
-      histEntry.afterImg = await captureScreenshot(wv);
-      histEntry.status = "complete";
-      histEntry.timestamp = Date.now();
-      return { ...a, result: "done" };
+    const results = await automation.runMulti(assignments, (sessionId, scriptName, i, step, status, err) => {
+      const identity = state.sessions.find(s => s.id === sessionId);
+      if (status === "running") log(`[${identity?.name}] Step ${i+1}: ${step.action}…`);
+      else if (status === "error") log(`[${identity?.name}] Step ${i+1}: ${err}`, "error");
     });
 
-    const results = await Promise.all(promises);
     for (const r of results) {
       const identity = state.sessions.find(s => s.id === r.sessionId);
-      if (r.result === "done") log(`[${identity?.name}] ✓ ${r.scriptName} complete`, "success");
-      else log(`[${identity?.name}] ✗ ${r.scriptName}: ${r.error}`, "error");
+      const histEntry = runHistory.find(h => h.script === r.scriptName && h.identity === identity?.name && h.status === "running");
+      if (r.result === "done") {
+        if (histEntry) { histEntry.status = "complete"; histEntry.timestamp = Date.now(); }
+        log(`[${identity?.name}] ✓ ${r.scriptName} complete`, "success");
+      } else {
+        if (histEntry) { histEntry.status = "error"; }
+        log(`[${identity?.name}] ✗ ${r.scriptName}: ${r.error}`, "error");
+      }
     }
   }
 
-  function scheduleMultiRun(assignments, input) {
-    const parsed = parseSchedule(input);
-    if (!parsed) { log("Could not parse schedule: " + input, "error"); return; }
+  function scheduleTabRun(a) {
+    const parsed = parseSchedule(a.schedInput);
+    if (!parsed) { log(`Bad schedule "${a.schedInput}" for ${a.scriptName}`, "error"); return; }
+
+    const identity = state.sessions.find(s => s.id === a.sessionId);
+    const histEntry = { timestamp: Date.now(), identity: identity?.name, tab: state.tabs.find(t => t.id === a.tabId)?.title, script: a.scriptName, status: "waiting", schedInput: a.schedInput };
+    runHistory.push(histEntry);
+
+    const runFn = async () => {
+      histEntry.status = "running";
+      histEntry.timestamp = Date.now();
+      if (state.tabSchedules[a.tabId]) state.tabSchedules[a.tabId].status = "running";
+      renderSidebar();
+      log(`[${identity?.name}] Running ${a.scriptName}…`, "info");
+      const tab = state.tabs.find(t => t.id === a.tabId);
+      if (!tab) { histEntry.status = "error"; return; }
+      try {
+        await automation.runScriptOnWebview(tab.webview, a.steps, null);
+        histEntry.status = "complete";
+        histEntry.timestamp = Date.now();
+        if (state.tabSchedules[a.tabId]) state.tabSchedules[a.tabId].status = "waiting";
+        renderSidebar();
+        log(`[${identity?.name}] ✓ ${a.scriptName} done`, "success");
+      } catch (e) {
+        histEntry.status = "error";
+        if (state.tabSchedules[a.tabId]) state.tabSchedules[a.tabId].status = "waiting";
+        renderSidebar();
+        log(`[${identity?.name}] ✗ ${a.scriptName}: ${e.message}`, "error");
+      }
+    };
+
+    let timer;
+    let nextRunAt = 0;
+    let interval = 0;
 
     if (parsed.type === "once") {
-      const when = new Date(Date.now() + parsed.delay);
-      log(`Multi-Run scheduled for ${when.toLocaleTimeString()}`, "success");
-      setTimeout(() => { log("Scheduled Multi-Run…", "info"); executeMultiRunV2(assignments); }, parsed.delay);
+      nextRunAt = Date.now() + parsed.delay;
+      timer = setTimeout(() => { runFn(); delete state.tabSchedules[a.tabId]; renderSidebar(); }, parsed.delay);
+      log(`Scheduled: ${a.scriptName} ${a.schedInput}`, "success");
     } else if (parsed.type === "recurring") {
-      const label = parsed.interval >= 60000 ? `${parsed.interval / 60000}m` : `${parsed.interval / 1000}s`;
-      log(`Multi-Run recurring every ${label}`, "success");
-      setInterval(() => { log("Recurring Multi-Run…", "info"); executeMultiRunV2(assignments); }, parsed.interval);
+      interval = parsed.interval;
+      nextRunAt = Date.now() + interval;
+      const wrappedRun = async () => { await runFn(); if (state.tabSchedules[a.tabId]) state.tabSchedules[a.tabId].nextRunAt = Date.now() + interval; };
+      timer = setInterval(wrappedRun, interval);
+      log(`Recurring: ${a.scriptName} ${a.schedInput}`, "success");
     } else if (parsed.type === "daily") {
-      const t = `${String(parsed.hours).padStart(2,"0")}:${String(parsed.minutes).padStart(2,"0")}`;
-      log(`Multi-Run daily at ${t}`, "success");
-      setInterval(() => {
-        const now = new Date();
-        if (now.getHours() === parsed.hours && now.getMinutes() === parsed.minutes && now.getSeconds() < 30) {
-          log("Daily Multi-Run…", "info"); executeMultiRunV2(assignments);
-        }
-      }, 30000);
+      timer = setInterval(() => { const now = new Date(); if (now.getHours() === parsed.hours && now.getMinutes() === parsed.minutes && now.getSeconds() < 30) runFn(); }, 30000);
+      log(`Daily: ${a.scriptName} at ${a.schedInput}`, "success");
     }
+
+    state.tabSchedules[a.tabId] = { scriptName: a.scriptName, schedInput: a.schedInput, timer, status: "waiting", createdAt: Date.now(), nextRunAt, interval };
+    renderSidebar();
   }
 
   return { toggle, create, loadSteps, showRunHistory };

@@ -119,8 +119,11 @@ The only Node-side surface it gets is `window.api` from `preload.js`.
 | Drag-tab-onto-identity to rebind                              | ✅     |
 | Native menu bar (File / Edit / Window with shortcuts)         | ✅     |
 | Identity-coloured tab borders                                 | ✅     |
-| Multi-Run scheduling (schedule parallel identity runs)        | ⏳     |
-| Identity tree (collapsible folder hierarchy in sidebar)       | ⏳     |
+| Sidebar tree (Identity → open tabs, collapsible)             | ✅     |
+| Multi-Run redesign (Identity → Tab → Script → Schedule)      | ✅     |
+| Per-tab scheduling with live countdown                        | ✅     |
+| Run History gallery (waiting / running / complete stages)     | ✅     |
+| Flexible schedule parser (1m, 5min, every 10m, 15:30, etc.)  | ✅     |
 | Auto-update via Squirrel                                      | ⏳     |
 | Script marketplace (share/import community scripts)           | ⏳     |
 | Conditional automation (if element exists → do X, else Y)    | ⏳     |
