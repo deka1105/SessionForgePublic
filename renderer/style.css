@@ -152,16 +152,44 @@ button, input { font-family: inherit; font-size: inherit; color: inherit; }
   padding: 6px 8px;
   -webkit-app-region: drag;
 }
-#tabs { display: flex; gap: 4px; flex: 1; overflow-x: auto; -webkit-app-region: no-drag; }
+#tabs { display: flex; gap: 6px; flex: 1; overflow-x: auto; -webkit-app-region: no-drag; }
+
+/* Identity Group Tabs — cluster tabs by identity with a colored left border */
+.tab-group {
+  display: flex; align-items: center; gap: 3px;
+  border-left: 2px solid var(--group-color);
+  border-radius: 4px;
+  padding-left: 4px;
+}
+.tab-group-header {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 6px; border-radius: 4px;
+  cursor: default; white-space: nowrap;
+}
+.tab-group-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  background: var(--group-color);
+}
+.tab-group-name {
+  font-size: 10px; font-weight: 600; color: var(--muted);
+  max-width: 80px; overflow: hidden; text-overflow: ellipsis;
+}
+.tab-group-add {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--muted); width: 18px; height: 18px;
+  border-radius: 4px; cursor: pointer; font-size: 12px; line-height: 1;
+  display: grid; place-items: center;
+}
+.tab-group-add:hover { background: var(--bg-hover); color: var(--text); }
+
 .tab {
   display: flex; align-items: center; gap: 6px;
   padding: 6px 10px; border-radius: 6px;
   background: var(--bg); border: 1px solid var(--border);
-  cursor: pointer; min-width: 120px; max-width: 220px;
+  cursor: pointer; min-width: 100px; max-width: 200px;
 }
 .tab:hover  { background: var(--bg-hover); }
-.tab.active { background: var(--bg-hover); border-color: var(--accent); }
-.tab-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.tab.active { background: var(--bg-hover); border-color: var(--group-color, var(--accent)); }
 .tab-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .tab-x {
   background: transparent; border: none; color: var(--muted);

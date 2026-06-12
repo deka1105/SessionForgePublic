@@ -233,21 +233,47 @@ function closeTab(id) {
 function renderTabs() {
   const root = $("tabs");
   root.replaceChildren();
+
+  // Group tabs by identity (preserving within-group order).
+  const groups = new Map();
   for (const t of state.tabs) {
-    const s   = state.sessions.find(s => s.id === t.sessionId);
-    const dot = el("span", { className: "tab-dot" });
-    if (s) dot.style.background = s.color;
-    const node = el("div", {
-      className: "tab" + (t.id === state.activeTab ? " active" : ""),
-      title:     `${s?.name ?? "?"} — ${t.url}`,
-      onclick:   () => activateTab(t.id),
-    },
-      dot,
-      el("span",   { className: "tab-title", textContent: t.title || t.url }),
-      el("button", { className: "tab-x", textContent: "×",
-                     onclick: e => { e.stopPropagation(); closeTab(t.id); } }),
+    if (!groups.has(t.sessionId)) groups.set(t.sessionId, []);
+    groups.get(t.sessionId).push(t);
+  }
+
+  for (const [sessionId, tabs] of groups) {
+    const s = state.sessions.find(s => s.id === sessionId);
+
+    // Identity group container
+    const group = el("div", { className: "tab-group" });
+    group.style.setProperty("--group-color", s?.color ?? "var(--accent)");
+
+    // Group header: identity name + add-tab-in-group button
+    const header = el("div", { className: "tab-group-header" },
+      el("span", { className: "tab-group-dot" }),
+      el("span", { className: "tab-group-name", textContent: s?.name ?? "?" }),
+      el("button", {
+        className: "tab-group-add", title: `New tab in "${s?.name}"`, textContent: "+",
+        onclick: e => { e.stopPropagation(); openTab(sessionId); },
+      }),
     );
-    root.append(node);
+    group.append(header);
+
+    // Individual tabs in this group
+    for (const t of tabs) {
+      const node = el("div", {
+        className: "tab" + (t.id === state.activeTab ? " active" : ""),
+        title:     `${s?.name ?? "?"} — ${t.url}`,
+        onclick:   () => activateTab(t.id),
+      },
+        el("span",   { className: "tab-title", textContent: t.title || t.url }),
+        el("button", { className: "tab-x", textContent: "×",
+                       onclick: e => { e.stopPropagation(); closeTab(t.id); } }),
+      );
+      group.append(node);
+    }
+
+    root.append(group);
   }
 }
 
