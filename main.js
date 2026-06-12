@@ -90,6 +90,26 @@ ipcMain.handle("sessions:clear", async (_e, id) => {
   return true;
 });
 
+// ─── Automation: input simulation via webContents ────────────────────────
+// The renderer can't directly call sendInputEvent on a webview's guest
+// webContents. We route it through IPC using the webContents ID.
+ipcMain.handle("automation:send-input", (_e, webContentsId, inputEvent) => {
+  const { webContents } = require("electron");
+  const wc = webContents.fromId(webContentsId);
+  if (!wc) return false;
+  wc.sendInputEvent(inputEvent);
+  return true;
+});
+
+// Insert text into the focused element of a webview's guest page.
+ipcMain.handle("automation:insert-text", async (_e, webContentsId, text) => {
+  const { webContents } = require("electron");
+  const wc = webContents.fromId(webContentsId);
+  if (!wc) return false;
+  await wc.insertText(text);
+  return true;
+});
+
 // ─── Automation IPC ──────────────────────────────────────────────────────
 // Save a screenshot (NativeImage buffer) to disk via a save dialog.
 ipcMain.handle("automation:save-screenshot", async (_e, pngBase64) => {

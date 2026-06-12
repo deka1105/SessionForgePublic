@@ -17,4 +17,6 @@ contextBridge.exposeInMainWorld("api", {
   listScripts:      ()          => ipcRenderer.invoke("automation:list-scripts"),
   saveScript:       (name, steps) => ipcRenderer.invoke("automation:save-script", name, steps),
   deleteScript:     (filename)  => ipcRenderer.invoke("automation:delete-script", filename),
+  sendInput:        (webContentsId, inputEvent) => ipcRenderer.invoke("automation:send-input", webContentsId, inputEvent),
+  insertText:       (webContentsId, text) => ipcRenderer.invoke("automation:insert-text", webContentsId, text),
 });

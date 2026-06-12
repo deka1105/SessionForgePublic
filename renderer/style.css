@@ -336,8 +336,14 @@ dialog menu button[value=ok]:hover { background: var(--accent); }
   margin-bottom: 10px; border: 1px solid var(--border);
   border-radius: 8px; overflow: hidden;
 }
+.auto-record.recording {
+  background: var(--danger) !important; border-color: var(--danger) !important;
+  color: #fff !important; animation: pulse 1s infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .7; } }
+
 .auto-step-header {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 4px;
   padding: 8px 10px; background: var(--bg); font-size: 12px;
 }
 .auto-step-num {
@@ -345,36 +351,46 @@ dialog menu button[value=ok]:hover { background: var(--accent); }
   background: var(--accent); color: #fff; font-size: 10px; font-weight: 700;
   display: grid; place-items: center; flex-shrink: 0;
 }
-.auto-step-label { flex: 1; font-weight: 600; }
+.auto-step-type {
+  background: var(--bg-hover); color: var(--text); border: 1px solid var(--border);
+  border-radius: 4px; font-size: 11px; padding: 2px 4px; cursor: pointer;
+}
+.auto-step-summary { flex: 1; color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .auto-step-status { font-size: 14px; }
 .auto-step-status.done { color: #4ade80; }
 .auto-step-status.error { color: var(--danger); }
 .auto-step-status.running { color: var(--accent); }
+.auto-step-up, .auto-step-down {
+  background: transparent; border: 1px solid var(--border); color: var(--muted);
+  cursor: pointer; font-size: 11px; width: 20px; height: 20px;
+  border-radius: 4px; display: grid; place-items: center;
+}
+.auto-step-up:hover, .auto-step-down:hover { color: var(--text); background: var(--bg-hover); }
+.auto-step-up:disabled, .auto-step-down:disabled { opacity: .3; cursor: default; }
 .auto-step-del {
   background: transparent; border: none; color: var(--muted);
   cursor: pointer; font-size: 16px;
 }
 .auto-step-del:hover { color: var(--danger); }
 
+.auto-schedule-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-top: 1px solid var(--border);
+  background: rgba(110,168,255,.05);
+}
+.auto-schedule-info { flex: 1; font-size: 11px; color: var(--accent); }
+.auto-schedule-cancel { font-size: 10px !important; }
+
 .auto-step-fields { padding: 8px 10px; }
 .auto-field-label {
   display: block; font-size: 10px; color: var(--muted); margin-bottom: 6px;
 }
-.auto-field-row {
-  display: flex; gap: 4px; align-items: center; margin-top: 2px;
-}
 .auto-field {
-  flex: 1; padding: 5px 8px;
+  width: 100%; padding: 5px 8px; margin-top: 2px;
   background: var(--bg); color: var(--text); border: 1px solid var(--border);
   border-radius: 4px; font-size: 12px; outline: none;
 }
 .auto-field:focus { border-color: var(--accent); }
-.auto-pick-btn {
-  padding: 4px 8px; border-radius: 4px; border: 1px solid var(--accent);
-  background: rgba(110,168,255,.1); color: var(--accent);
-  font-size: 11px; cursor: pointer; white-space: nowrap;
-}
-.auto-pick-btn:hover { background: rgba(110,168,255,.2); }
 
 .auto-add-step {
   display: flex; gap: 6px; padding: 10px 16px;
@@ -396,3 +412,30 @@ dialog menu button[value=ok]:hover { background: var(--accent); }
 .auto-log-success { color: #4ade80; }
 .auto-log-warn { color: #facc15; }
 .auto-log-error { color: var(--danger); }
+
+/* Custom prompt dialog (replaces window.prompt) */
+.auto-prompt-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.5); display: grid; place-items: center;
+}
+.auto-prompt-box {
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px;
+  padding: 20px; width: 340px;
+}
+.auto-prompt-title {
+  color: var(--text); font-size: 13px; margin-bottom: 12px; white-space: pre-line;
+}
+.auto-prompt-input {
+  width: 100%; padding: 8px 10px; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px; outline: none; font-size: 13px;
+}
+.auto-prompt-input:focus { border-color: var(--accent); }
+.auto-prompt-actions {
+  display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;
+}
+.auto-prompt-cancel, .auto-prompt-ok {
+  padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+}
+.auto-prompt-ok { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
+.auto-prompt-ok:hover { background: var(--accent); }

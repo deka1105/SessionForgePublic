@@ -1,156 +1,57 @@
-// SessionForge Browser — Automation Panel UI
+// SessionForge Browser — Automation Panel UI (v2: coordinate-based + record)
 //
-// A slide-out panel for building, saving, and running automation scripts.
-// Each script is a list of steps; each step has an action + params.
+// Record interactions → replay at same coordinates. No CSS selectors needed.
+// Features: record, reorder steps, change step type, schedule runs.
 
 const automationPanel = (() => {
   let panelEl = null;
   let currentSteps = [];
   let isRunning = false;
+  let schedulerTimer = null;
 
   const ACTION_DEFS = [
-    { action: "click",            label: "Click",             fields: [{ key: "selector", label: "Element", placeholder: "Click 🎯 Pick to select", picker: true }, { key: "x", label: "X (optional)", type: "number" }, { key: "y", label: "Y (optional)", type: "number" }] },
-    { action: "type",             label: "Type Text",         fields: [{ key: "selector", label: "Element", placeholder: "Click 🎯 Pick to select", picker: true }, { key: "text", label: "Text to type" }] },
-    { action: "keystroke",        label: "Keystroke",         fields: [{ key: "keys", label: "Keys", placeholder: "Ctrl+A, Enter, Tab" }] },
-    { action: "navigate",         label: "Navigate",          fields: [{ key: "url", label: "URL", placeholder: "https://example.com" }] },
-    { action: "wait",             label: "Wait",              fields: [{ key: "ms", label: "Milliseconds", type: "number", placeholder: "1000" }] },
-    { action: "waitForSelector",  label: "Wait for Element",  fields: [{ key: "selector", label: "Element", placeholder: "Click 🎯 Pick to select", picker: true }, { key: "timeout", label: "Timeout (ms)", type: "number", placeholder: "10000" }] },
-    { action: "screenshot",       label: "Screenshot",        fields: [] },
-    { action: "printPdf",         label: "Print to PDF",      fields: [] },
-    { action: "scrollTo",         label: "Scroll To",         fields: [{ key: "x", label: "X", type: "number", placeholder: "0" }, { key: "y", label: "Y", type: "number", placeholder: "500" }] },
+    { action: "click",      label: "Click",       fields: [{ key: "x", label: "X", type: "number" }, { key: "y", label: "Y", type: "number" }] },
+    { action: "type",       label: "Type",        fields: [{ key: "text", label: "Text" }] },
+    { action: "keystroke",  label: "Key",         fields: [{ key: "keys", label: "Keys", placeholder: "Enter, Ctrl+A, Tab" }] },
+    { action: "navigate",   label: "Go to URL",   fields: [{ key: "url", label: "URL", placeholder: "https://..." }] },
+    { action: "wait",       label: "Wait",        fields: [{ key: "ms", label: "ms", type: "number", placeholder: "1000" }] },
+    { action: "screenshot", label: "Screenshot",  fields: [] },
+    { action: "printPdf",   label: "Print PDF",   fields: [] },
+    { action: "scroll",     label: "Scroll",      fields: [{ key: "dx", label: "↔", type: "number", placeholder: "0" }, { key: "dy", label: "↕", type: "number", placeholder: "300" }] },
   ];
 
-  // ── Element Picker ─────────────────────────────────────────────────────
-  // Injects a visual picker into the active webview. User clicks an element
-  // and we compute a readable, unique selector for it.
-  let pickerCallback = null;
+  // ── Custom prompt (replaces blocked window.prompt) ────────────────────
+  function showPrompt(title, placeholder = "") {
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.className = "auto-prompt-overlay";
+      overlay.innerHTML = `
+        <div class="auto-prompt-box">
+          <div class="auto-prompt-title">${title}</div>
+          <input class="auto-prompt-input" type="text" placeholder="${placeholder}" autofocus>
+          <div class="auto-prompt-actions">
+            <button class="auto-prompt-cancel">Cancel</button>
+            <button class="auto-prompt-ok">OK</button>
+          </div>
+        </div>
+      `;
+      document.body.append(overlay);
 
-  function startPicker(onPicked) {
-    const tab = state.tabs.find(t => t.id === state.activeTab);
-    if (!tab) return;
-    const wv = tab.webview;
-    pickerCallback = onPicked;
+      const input = overlay.querySelector(".auto-prompt-input");
+      const ok = () => { const val = input.value.trim(); overlay.remove(); resolve(val || null); };
+      const cancel = () => { overlay.remove(); resolve(null); };
 
-    // Inject picker overlay into the webview
-    wv.executeJavaScript(`
-      (() => {
-        if (window.__sfPickerActive) return;
-        window.__sfPickerActive = true;
-
-        const overlay = document.createElement('div');
-        overlay.id = '__sf_picker_overlay';
-        overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;cursor:crosshair;';
-        document.body.appendChild(overlay);
-
-        const highlight = document.createElement('div');
-        highlight.id = '__sf_picker_highlight';
-        highlight.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483646;border:2px solid #6ea8ff;background:rgba(110,168,255,.15);border-radius:3px;transition:all .05s;display:none;';
-        document.body.appendChild(highlight);
-
-        const label = document.createElement('div');
-        label.id = '__sf_picker_label';
-        label.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;background:#0f1115;color:#e7ecf3;font:11px monospace;padding:3px 7px;border-radius:4px;white-space:nowrap;display:none;';
-        document.body.appendChild(label);
-
-        function bestSelector(el) {
-          if (el.id) return '#' + CSS.escape(el.id);
-          // Try unique attribute selectors
-          for (const attr of ['name', 'data-testid', 'aria-label', 'placeholder', 'type']) {
-            const val = el.getAttribute(attr);
-            if (val) {
-              const sel = el.tagName.toLowerCase() + '[' + attr + '=' + JSON.stringify(val) + ']';
-              if (document.querySelectorAll(sel).length === 1) return sel;
-            }
-          }
-          // nth-child path (last resort but always unique)
-          const parts = [];
-          let node = el;
-          while (node && node !== document.body) {
-            const parent = node.parentElement;
-            if (!parent) break;
-            const siblings = [...parent.children].filter(c => c.tagName === node.tagName);
-            if (siblings.length > 1) {
-              const idx = siblings.indexOf(node) + 1;
-              parts.unshift(node.tagName.toLowerCase() + ':nth-of-type(' + idx + ')');
-            } else {
-              parts.unshift(node.tagName.toLowerCase());
-            }
-            node = parent;
-            // Stop early if unique
-            const candidate = parts.join(' > ');
-            if (document.querySelectorAll(candidate).length === 1) return candidate;
-          }
-          return parts.join(' > ');
-        }
-
-        function describeEl(el) {
-          let desc = el.tagName.toLowerCase();
-          if (el.id) desc += '#' + el.id;
-          else if (el.className && typeof el.className === 'string') desc += '.' + el.className.trim().split(/\\s+/).slice(0,2).join('.');
-          const text = (el.textContent || '').trim().slice(0, 30);
-          if (text) desc += ' "' + text + '"';
-          return desc;
-        }
-
-        overlay.addEventListener('mousemove', (e) => {
-          overlay.style.pointerEvents = 'none';
-          const target = document.elementFromPoint(e.clientX, e.clientY);
-          overlay.style.pointerEvents = '';
-          if (!target || target === overlay || target === highlight) return;
-          const rect = target.getBoundingClientRect();
-          highlight.style.display = 'block';
-          highlight.style.top = rect.top + 'px';
-          highlight.style.left = rect.left + 'px';
-          highlight.style.width = rect.width + 'px';
-          highlight.style.height = rect.height + 'px';
-          label.style.display = 'block';
-          label.style.top = Math.max(0, rect.top - 22) + 'px';
-          label.style.left = rect.left + 'px';
-          label.textContent = describeEl(target);
-        });
-
-        overlay.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          overlay.style.pointerEvents = 'none';
-          const target = document.elementFromPoint(e.clientX, e.clientY);
-          overlay.style.pointerEvents = '';
-          const selector = bestSelector(target);
-          // Cleanup
-          overlay.remove();
-          highlight.remove();
-          label.remove();
-          window.__sfPickerActive = false;
-          // Return result via console (captured by host)
-          window.__sfPickerResult = selector;
-        });
-
-        // ESC to cancel
-        document.addEventListener('keydown', function esc(e) {
-          if (e.key === 'Escape') {
-            overlay.remove(); highlight.remove(); label.remove();
-            window.__sfPickerActive = false;
-            window.__sfPickerResult = '';
-            document.removeEventListener('keydown', esc);
-          }
-        });
-      })()
-    `);
-
-    // Poll for result (webview doesn't have direct callback channel to renderer)
-    const poll = setInterval(async () => {
-      try {
-        const result = await wv.executeJavaScript(`window.__sfPickerResult`);
-        if (result !== undefined) {
-          clearInterval(poll);
-          await wv.executeJavaScript(`delete window.__sfPickerResult`);
-          if (pickerCallback && result) pickerCallback(result);
-          pickerCallback = null;
-        }
-      } catch { /* webview navigated or closed — stop polling */ clearInterval(poll); }
-    }, 200);
+      overlay.querySelector(".auto-prompt-ok").onclick = ok;
+      overlay.querySelector(".auto-prompt-cancel").onclick = cancel;
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") ok();
+        if (e.key === "Escape") cancel();
+      });
+      setTimeout(() => input.focus(), 50);
+    });
   }
 
+  // ── Create panel ──────────────────────────────────────────────────────
   function create() {
     panelEl = document.createElement("aside");
     panelEl.id = "automationPanel";
@@ -161,29 +62,37 @@ const automationPanel = (() => {
         <button class="auto-close" title="Close panel">×</button>
       </header>
       <div class="auto-toolbar">
+        <button class="auto-btn auto-record" title="Record interactions">⏺ Record</button>
         <button class="auto-btn auto-run" title="Run script">▶ Run</button>
         <button class="auto-btn auto-save" title="Save script">💾 Save</button>
         <button class="auto-btn auto-load" title="Load script">📂 Load</button>
-        <button class="auto-btn auto-clear" title="Clear steps">🗑 Clear</button>
+        <button class="auto-btn auto-schedule" title="Schedule this script">⏰</button>
       </div>
       <div class="auto-steps"></div>
       <div class="auto-add-step">
         <select class="auto-action-select">
           ${ACTION_DEFS.map(a => `<option value="${a.action}">${a.label}</option>`).join("")}
         </select>
-        <button class="auto-btn auto-add-btn">+ Add Step</button>
+        <button class="auto-btn auto-add-btn">+ Add</button>
+        <button class="auto-btn auto-clear-btn" title="Clear all steps">🗑</button>
+      </div>
+      <div class="auto-schedule-bar" style="display:none;">
+        <span class="auto-schedule-info"></span>
+        <button class="auto-btn auto-schedule-cancel">✕ Cancel</button>
       </div>
       <div class="auto-log"></div>
     `;
     document.getElementById("app").append(panelEl);
 
-    // Wire events
     panelEl.querySelector(".auto-close").onclick = () => toggle(false);
+    panelEl.querySelector(".auto-record").onclick = toggleRecord;
     panelEl.querySelector(".auto-run").onclick = run;
     panelEl.querySelector(".auto-save").onclick = save;
     panelEl.querySelector(".auto-load").onclick = load;
-    panelEl.querySelector(".auto-clear").onclick = () => { currentSteps = []; renderSteps(); };
+    panelEl.querySelector(".auto-schedule").onclick = schedulePrompt;
     panelEl.querySelector(".auto-add-btn").onclick = addStep;
+    panelEl.querySelector(".auto-clear-btn").onclick = () => { currentSteps = []; renderSteps(); };
+    panelEl.querySelector(".auto-schedule-cancel").onclick = cancelSchedule;
   }
 
   function toggle(show) {
@@ -192,6 +101,30 @@ const automationPanel = (() => {
     panelEl.classList.toggle("open", visible);
   }
 
+  // ── Recording ─────────────────────────────────────────────────────────
+  async function toggleRecord() {
+    const btn = panelEl.querySelector(".auto-record");
+    if (automation.isRecording()) {
+      btn.textContent = "⏳ Saving…";
+      const steps = automation.stopRecording();
+      // Wait a moment for the flush to capture last typed text
+      await new Promise(r => setTimeout(r, 500));
+      currentSteps.push(...steps);
+      renderSteps();
+      btn.textContent = "⏺ Record";
+      btn.classList.remove("recording");
+      log(`Recorded ${steps.length} steps`, "success");
+    } else {
+      automation.startRecording((ev) => {
+        log(`Rec: ${ev.action} ${ev.params.x !== undefined ? `(${ev.params.x},${ev.params.y})` : (ev.params.keys || ev.params.text || "")}`, "info");
+      });
+      btn.textContent = "⏹ Stop";
+      btn.classList.add("recording");
+      log("Recording… interact with the page, then press Stop", "info");
+    }
+  }
+
+  // ── Add step manually ─────────────────────────────────────────────────
   function addStep() {
     const action = panelEl.querySelector(".auto-action-select").value;
     const def = ACTION_DEFS.find(a => a.action === action);
@@ -201,6 +134,7 @@ const automationPanel = (() => {
     renderSteps();
   }
 
+  // ── Render steps ──────────────────────────────────────────────────────
   function renderSteps() {
     const container = panelEl.querySelector(".auto-steps");
     container.replaceChildren();
@@ -209,40 +143,68 @@ const automationPanel = (() => {
       const def = ACTION_DEFS.find(a => a.action === step.action);
       const stepEl = document.createElement("div");
       stepEl.className = "auto-step";
-      stepEl.dataset.index = i;
+
+      let summary = "";
+      if (step.action === "click") summary = `(${step.params.x}, ${step.params.y})`;
+      else if (step.action === "type") summary = `"${(step.params.text || "").slice(0, 20)}"`;
+      else if (step.action === "keystroke") summary = step.params.keys || "";
+      else if (step.action === "navigate") summary = (step.params.url || "").slice(0, 25);
+      else if (step.action === "wait") summary = `${step.params.ms || 0}ms`;
+      else if (step.action === "scroll") summary = `↕${step.params.dy || 0}`;
 
       let fieldsHtml = "";
-      def.fields.forEach(f => {
-        const val = step.params[f.key] ?? "";
-        const pickerBtn = f.picker
-          ? `<button class="auto-pick-btn" data-step="${i}" data-key="${f.key}" title="Pick element visually">🎯 Pick</button>`
-          : "";
-        fieldsHtml += `<label class="auto-field-label">${f.label}
-          <span class="auto-field-row">
+      if (def) {
+        def.fields.forEach(f => {
+          const val = step.params[f.key] ?? "";
+          fieldsHtml += `<label class="auto-field-label">${f.label}
             <input class="auto-field" data-key="${f.key}" type="${f.type || "text"}"
                    value="${val}" placeholder="${f.placeholder || ""}">
-            ${pickerBtn}
-          </span>
-        </label>`;
-      });
+          </label>`;
+        });
+      }
+
+      const actionOptions = ACTION_DEFS.map(a =>
+        `<option value="${a.action}" ${a.action === step.action ? "selected" : ""}>${a.label}</option>`
+      ).join("");
 
       stepEl.innerHTML = `
         <div class="auto-step-header">
           <span class="auto-step-num">${i + 1}</span>
-          <span class="auto-step-label">${def.label}</span>
+          <select class="auto-step-type" title="Change step type">${actionOptions}</select>
+          <span class="auto-step-summary">${summary}</span>
           <span class="auto-step-status"></span>
-          <button class="auto-step-del" title="Remove step">×</button>
+          <button class="auto-step-up" title="Move up" ${i === 0 ? "disabled" : ""}>↑</button>
+          <button class="auto-step-down" title="Move down" ${i === currentSteps.length - 1 ? "disabled" : ""}>↓</button>
+          <button class="auto-step-del" title="Remove">×</button>
         </div>
         <div class="auto-step-fields">${fieldsHtml}</div>
       `;
 
-      // Remove button
+      stepEl.querySelector(".auto-step-type").onchange = (e) => {
+        const newAction = e.target.value;
+        const newDef = ACTION_DEFS.find(a => a.action === newAction);
+        const newParams = {};
+        newDef.fields.forEach(f => { newParams[f.key] = step.params[f.key] ?? ""; });
+        currentSteps[i] = { action: newAction, params: newParams };
+        renderSteps();
+      };
+
+      stepEl.querySelector(".auto-step-up").onclick = () => {
+        if (i === 0) return;
+        [currentSteps[i - 1], currentSteps[i]] = [currentSteps[i], currentSteps[i - 1]];
+        renderSteps();
+      };
+      stepEl.querySelector(".auto-step-down").onclick = () => {
+        if (i >= currentSteps.length - 1) return;
+        [currentSteps[i], currentSteps[i + 1]] = [currentSteps[i + 1], currentSteps[i]];
+        renderSteps();
+      };
+
       stepEl.querySelector(".auto-step-del").onclick = () => {
         currentSteps.splice(i, 1);
         renderSteps();
       };
 
-      // Field change bindings
       stepEl.querySelectorAll(".auto-field").forEach(input => {
         input.oninput = () => {
           const key = input.dataset.key;
@@ -250,70 +212,119 @@ const automationPanel = (() => {
         };
       });
 
-      // Picker buttons
-      stepEl.querySelectorAll(".auto-pick-btn").forEach(btn => {
-        btn.onclick = () => {
-          const stepIdx = Number(btn.dataset.step);
-          const key = btn.dataset.key;
-          btn.textContent = "⏳ Picking…";
-          startPicker((selector) => {
-            currentSteps[stepIdx].params[key] = selector;
-            renderSteps();
-            log(`Picked: ${selector}`, "success");
-          });
-        };
-      });
-
       container.append(stepEl);
     });
   }
 
-  function log(msg, type = "info") {
-    const logEl = panelEl.querySelector(".auto-log");
-    const line = document.createElement("div");
-    line.className = `auto-log-line auto-log-${type}`;
-    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    logEl.append(line);
-    logEl.scrollTop = logEl.scrollHeight;
+  // ── Scheduling ────────────────────────────────────────────────────────
+  async function schedulePrompt() {
+    if (!currentSteps.length) { log("Add steps first", "warn"); return; }
+    const input = await showPrompt(
+      "Schedule automation:\n• 'in 5m' — run once in 5 minutes\n• '15:30' — run once at 3:30 PM\n• 'every 10m' — recurring\n• 'every day at 09:00'",
+      "e.g. every 10m"
+    );
+    if (!input) return;
+    const parsed = parseSchedule(input);
+    if (!parsed) { log("Could not parse: " + input, "error"); return; }
+    setSchedule(parsed);
+  }
+
+  function parseSchedule(input) {
+    let m = input.match(/^in\s+(\d+)\s*(s|m|h)$/i);
+    if (m) {
+      const mult = { s: 1000, m: 60000, h: 3600000 };
+      return { type: "once", delay: parseInt(m[1]) * mult[m[2].toLowerCase()] };
+    }
+    m = input.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
+    if (m) {
+      let h = parseInt(m[1]); const min = parseInt(m[2]);
+      if (m[3]?.toLowerCase() === "pm" && h < 12) h += 12;
+      if (m[3]?.toLowerCase() === "am" && h === 12) h = 0;
+      const now = new Date();
+      const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, min);
+      if (target <= now) target.setDate(target.getDate() + 1);
+      return { type: "once", delay: target - now };
+    }
+    m = input.match(/^every\s+(\d+)\s*(s|m|h)$/i);
+    if (m) {
+      const mult = { s: 1000, m: 60000, h: 3600000 };
+      return { type: "recurring", interval: parseInt(m[1]) * mult[m[2].toLowerCase()] };
+    }
+    m = input.match(/^every\s+day\s+at\s+(\d{1,2}):(\d{2})$/i);
+    if (m) return { type: "daily", hours: parseInt(m[1]), minutes: parseInt(m[2]) };
+    return null;
+  }
+
+  function setSchedule(schedule) {
+    cancelSchedule(true);
+    const stepsSnapshot = JSON.parse(JSON.stringify(currentSteps));
+    const bar = panelEl.querySelector(".auto-schedule-bar");
+    const info = panelEl.querySelector(".auto-schedule-info");
+
+    if (schedule.type === "once") {
+      const when = new Date(Date.now() + schedule.delay);
+      info.textContent = `Run at ${when.toLocaleTimeString()}`;
+      bar.style.display = "flex";
+      schedulerTimer = setTimeout(() => { log("Scheduled run…", "info"); runSteps(stepsSnapshot); bar.style.display = "none"; }, schedule.delay);
+      log(`Scheduled for ${when.toLocaleTimeString()}`, "success");
+    } else if (schedule.type === "recurring") {
+      const label = schedule.interval >= 60000 ? `${schedule.interval / 60000}m` : `${schedule.interval / 1000}s`;
+      info.textContent = `Every ${label}`;
+      bar.style.display = "flex";
+      schedulerTimer = setInterval(() => { log("Recurring run…", "info"); runSteps(stepsSnapshot); }, schedule.interval);
+      log(`Recurring every ${label}`, "success");
+    } else if (schedule.type === "daily") {
+      const t = `${String(schedule.hours).padStart(2,"0")}:${String(schedule.minutes).padStart(2,"0")}`;
+      info.textContent = `Daily at ${t}`;
+      bar.style.display = "flex";
+      schedulerTimer = setInterval(() => {
+        const now = new Date();
+        if (now.getHours() === schedule.hours && now.getMinutes() === schedule.minutes && now.getSeconds() < 30) {
+          log("Daily run…", "info");
+          runSteps(stepsSnapshot);
+        }
+      }, 30000);
+      log(`Daily at ${t}`, "success");
+    }
+  }
+
+  function cancelSchedule(silent) {
+    if (schedulerTimer) { clearInterval(schedulerTimer); clearTimeout(schedulerTimer); schedulerTimer = null; }
+    if (panelEl) panelEl.querySelector(".auto-schedule-bar").style.display = "none";
+    if (!silent) log("Schedule cancelled", "info");
+  }
+
+  // ── Run ───────────────────────────────────────────────────────────────
+  async function runSteps(steps) {
+    try {
+      await automation.runScript(steps, (i, step, status, err) => {
+        if (!panelEl) return;
+        const statusEls = panelEl.querySelectorAll(".auto-step-status");
+        const statusEl = statusEls[i];
+        if (!statusEl) return;
+        if (status === "running") { statusEl.textContent = "⏳"; statusEl.className = "auto-step-status running"; }
+        else if (status === "done") { statusEl.textContent = "✓"; statusEl.className = "auto-step-status done"; }
+        else if (status === "error") { statusEl.textContent = "✗"; statusEl.className = "auto-step-status error"; log(`Step ${i+1}: ${err}`, "error"); }
+      });
+    } catch (e) { log(`Failed: ${e.message}`, "error"); }
   }
 
   async function run() {
     if (isRunning) return;
-    if (!currentSteps.length) { log("No steps to run", "warn"); return; }
+    if (!currentSteps.length) { log("No steps", "warn"); return; }
     isRunning = true;
     panelEl.querySelector(".auto-run").textContent = "⏸ Running…";
-    log("Starting automation…", "info");
-
-    // Clear previous statuses
     panelEl.querySelectorAll(".auto-step-status").forEach(el => { el.textContent = ""; el.className = "auto-step-status"; });
-
-    try {
-      await automation.runScript(currentSteps, (i, step, status, err) => {
-        const statusEl = panelEl.querySelectorAll(".auto-step-status")[i];
-        if (status === "running") {
-          statusEl.textContent = "⏳";
-          statusEl.className = "auto-step-status running";
-          log(`Step ${i + 1}: ${step.action}…`);
-        } else if (status === "done") {
-          statusEl.textContent = "✓";
-          statusEl.className = "auto-step-status done";
-        } else if (status === "error") {
-          statusEl.textContent = "✗";
-          statusEl.className = "auto-step-status error";
-          log(`Step ${i + 1} failed: ${err}`, "error");
-        }
-      });
-      log("Automation complete!", "success");
-    } catch (err) {
-      log(`Stopped: ${err.message}`, "error");
-    }
-
+    log("Running…", "info");
+    await runSteps(currentSteps);
     isRunning = false;
     panelEl.querySelector(".auto-run").textContent = "▶ Run";
+    log("Done!", "success");
   }
 
+  // ── Save / Load ───────────────────────────────────────────────────────
   async function save() {
-    const name = prompt("Script name:");
+    const name = await showPrompt("Save script as:", "my-automation");
     if (!name) return;
     const filename = await window.api.saveScript(name, currentSteps);
     log(`Saved: ${filename}`, "success");
@@ -322,16 +333,25 @@ const automationPanel = (() => {
   async function load() {
     const scripts = await window.api.listScripts();
     if (!scripts.length) { log("No saved scripts", "warn"); return; }
-
-    const names = scripts.map((s, i) => `${i + 1}. ${s.name}`).join("\n");
-    const pick = prompt(`Load which script?\n\n${names}\n\nEnter number:`);
+    const names = scripts.map((s, i) => `${i + 1}. ${s.name}`).join(", ");
+    const pick = await showPrompt(`Load script (${names}):`, "Enter number");
     if (!pick) return;
     const idx = parseInt(pick, 10) - 1;
-    if (idx < 0 || idx >= scripts.length) { log("Invalid selection", "warn"); return; }
-
+    if (idx < 0 || idx >= scripts.length) { log("Invalid", "warn"); return; }
     currentSteps = scripts[idx].steps;
     renderSteps();
     log(`Loaded: ${scripts[idx].name}`, "info");
+  }
+
+  // ── Log ───────────────────────────────────────────────────────────────
+  function log(msg, type = "info") {
+    if (!panelEl) return;
+    const logEl = panelEl.querySelector(".auto-log");
+    const line = document.createElement("div");
+    line.className = `auto-log-line auto-log-${type}`;
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    logEl.append(line);
+    logEl.scrollTop = logEl.scrollHeight;
   }
 
   return { toggle, create };
