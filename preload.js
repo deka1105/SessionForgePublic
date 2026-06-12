@@ -10,4 +10,11 @@ contextBridge.exposeInMainWorld("api", {
   listSessions:  ()           => ipcRenderer.invoke("sessions:list"),
   saveSessions:  (sessions)   => ipcRenderer.invoke("sessions:save", sessions),
   clearSession:  (id)         => ipcRenderer.invoke("sessions:clear", id),
+
+  // Automation
+  saveScreenshot:   (pngBase64) => ipcRenderer.invoke("automation:save-screenshot", pngBase64),
+  savePdf:          (pdfBase64) => ipcRenderer.invoke("automation:save-pdf", pdfBase64),
+  listScripts:      ()          => ipcRenderer.invoke("automation:list-scripts"),
+  saveScript:       (name, steps) => ipcRenderer.invoke("automation:save-script", name, steps),
+  deleteScript:     (filename)  => ipcRenderer.invoke("automation:delete-script", filename),
 });

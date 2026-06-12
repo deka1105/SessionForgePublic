@@ -287,3 +287,103 @@ dialog menu button {
 }
 dialog menu button[value=ok] { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
 dialog menu button[value=ok]:hover { background: var(--accent); }
+
+/* ── Automation Panel ───────────────────────────────────────────────── */
+#automationBtn {
+  width: auto !important; padding: 0 10px !important;
+  font-size: 12px; border: 1px solid var(--border) !important;
+  background: transparent;
+}
+#automationBtn:hover { background: var(--bg-hover); color: var(--accent); }
+
+.auto-panel {
+  position: fixed; top: 0; right: -380px; width: 380px; height: 100vh;
+  background: var(--bg-elev); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  z-index: 100; transition: right .2s ease;
+  box-shadow: -4px 0 20px rgba(0,0,0,.3);
+}
+.auto-panel.open { right: 0; }
+
+.auto-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+}
+.auto-header h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.auto-close {
+  background: transparent; border: none; color: var(--muted);
+  font-size: 20px; cursor: pointer;
+}
+.auto-close:hover { color: var(--danger); }
+
+.auto-toolbar {
+  display: flex; gap: 6px; padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.auto-btn {
+  padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); cursor: pointer; font-size: 11px;
+}
+.auto-btn:hover { background: var(--bg-hover); }
+.auto-run { border-color: var(--accent); color: var(--accent); }
+.auto-run:hover { background: rgba(110,168,255,.1); }
+
+.auto-steps {
+  flex: 1; overflow-y: auto; padding: 10px 16px;
+}
+
+.auto-step {
+  margin-bottom: 10px; border: 1px solid var(--border);
+  border-radius: 8px; overflow: hidden;
+}
+.auto-step-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; background: var(--bg); font-size: 12px;
+}
+.auto-step-num {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--accent); color: #fff; font-size: 10px; font-weight: 700;
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.auto-step-label { flex: 1; font-weight: 600; }
+.auto-step-status { font-size: 14px; }
+.auto-step-status.done { color: #4ade80; }
+.auto-step-status.error { color: var(--danger); }
+.auto-step-status.running { color: var(--accent); }
+.auto-step-del {
+  background: transparent; border: none; color: var(--muted);
+  cursor: pointer; font-size: 16px;
+}
+.auto-step-del:hover { color: var(--danger); }
+
+.auto-step-fields { padding: 8px 10px; }
+.auto-field-label {
+  display: block; font-size: 10px; color: var(--muted); margin-bottom: 6px;
+}
+.auto-field {
+  width: 100%; padding: 5px 8px; margin-top: 2px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  border-radius: 4px; font-size: 12px; outline: none;
+}
+.auto-field:focus { border-color: var(--accent); }
+
+.auto-add-step {
+  display: flex; gap: 6px; padding: 10px 16px;
+  border-top: 1px solid var(--border);
+}
+.auto-action-select {
+  flex: 1; padding: 6px 8px; border-radius: 6px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  font-size: 12px; outline: none;
+}
+.auto-add-btn { white-space: nowrap; }
+
+.auto-log {
+  max-height: 120px; overflow-y: auto; padding: 8px 16px;
+  border-top: 1px solid var(--border); font-size: 11px; font-family: monospace;
+}
+.auto-log-line { padding: 2px 0; }
+.auto-log-info { color: var(--muted); }
+.auto-log-success { color: #4ade80; }
+.auto-log-warn { color: #facc15; }
+.auto-log-error { color: var(--danger); }

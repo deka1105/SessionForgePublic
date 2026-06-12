@@ -406,5 +406,16 @@ document.addEventListener("keydown", (e) => {
 // Clear any legacy persisted collapse state from earlier builds.
 localStorage.removeItem("sfox.sidebarCollapsed");
 
+// ── automation panel toggle ─────────────────────────────────────────────
+$("automationBtn").onclick = () => automationPanel.toggle();
+
+// ⌘⇧A / Ctrl+Shift+A — toggle automation panel.
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "a") {
+    e.preventDefault();
+    automationPanel.toggle();
+  }
+});
+
 // ── boot ─────────────────────────────────────────────────────────────────
 loadSessions().then(restoreTabs);

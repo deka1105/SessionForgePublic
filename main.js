@@ -10,7 +10,7 @@
 // userData/Partitions/<id>, which gives us full isolation between sessions
 // even when they're loading the same URL.
 
-const { app, BrowserWindow, ipcMain, session } = require("electron");
+const { app, BrowserWindow, ipcMain, session, dialog } = require("electron");
 const path = require("node:path");
 const fs   = require("node:fs");
 
@@ -87,6 +87,59 @@ ipcMain.handle("sessions:save",   (_e, sessions) => { saveSessions(sessions); re
 ipcMain.handle("sessions:clear", async (_e, id) => {
   const part = session.fromPartition(`persist:${id}`);
   await part.clearStorageData();
+  return true;
+});
+
+// ─── Automation IPC ──────────────────────────────────────────────────────
+// Save a screenshot (NativeImage buffer) to disk via a save dialog.
+ipcMain.handle("automation:save-screenshot", async (_e, pngBase64) => {
+  const win = BrowserWindow.getFocusedWindow();
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    title: "Save Screenshot",
+    defaultPath: `screenshot-${Date.now()}.png`,
+    filters: [{ name: "PNG Image", extensions: ["png"] }],
+  });
+  if (canceled || !filePath) return null;
+  fs.writeFileSync(filePath, Buffer.from(pngBase64, "base64"));
+  return filePath;
+});
+
+// Save a PDF (from printToPDF) to disk via a save dialog.
+ipcMain.handle("automation:save-pdf", async (_e, pdfBase64) => {
+  const win = BrowserWindow.getFocusedWindow();
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    title: "Save Page as PDF",
+    defaultPath: `page-${Date.now()}.pdf`,
+    filters: [{ name: "PDF Document", extensions: ["pdf"] }],
+  });
+  if (canceled || !filePath) return null;
+  fs.writeFileSync(filePath, Buffer.from(pdfBase64, "base64"));
+  return filePath;
+});
+
+// Save/load automation scripts to/from disk.
+const automationsDir = () => path.join(app.getPath("userData"), "automations");
+
+ipcMain.handle("automation:list-scripts", () => {
+  const dir = automationsDir();
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter(f => f.endsWith(".json")).map(f => {
+    const raw = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
+    return { filename: f, ...raw };
+  });
+});
+
+ipcMain.handle("automation:save-script", (_e, name, steps) => {
+  const dir = automationsDir();
+  fs.mkdirSync(dir, { recursive: true });
+  const filename = name.replace(/[^a-z0-9_-]/gi, "_") + ".json";
+  fs.writeFileSync(path.join(dir, filename), JSON.stringify({ name, steps }, null, 2));
+  return filename;
+});
+
+ipcMain.handle("automation:delete-script", (_e, filename) => {
+  const filepath = path.join(automationsDir(), filename);
+  if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
   return true;
 });
 
