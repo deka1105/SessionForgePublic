@@ -92,31 +92,38 @@ renderer/
 Renderer is sandboxed: `contextIsolation: true`, `nodeIntegration: false`.
 The only Node-side surface it gets is `window.api` from `preload.js`.
 
-## Coming next: identity automation
-
-A future release will let you drive any identity programmatically — open
-a URL, find a specific text box on the page, and type a message — all
-scoped to one identity's session. Send the same prompt to three Claude
-accounts at once, dispatch a templated message to ten support tickets,
-or run a scripted login sequence on first launch of a new identity.
-Tracked below.
-
-## Roadmap
+## Version 4X (current)
 
 | Feature                                                       | Status |
 |---------------------------------------------------------------|--------|
 | Tabs, identities, partitions                                  | ✅     |
-| Bookmarks                                                     | ⏳     |
-| Per-identity history                                          | ⏳     |
-| Identity-coloured tab borders                                 | ⏳     |
-| Find-in-page                                                  | ⏳     |
-| Native menu bar (File / Edit / Window)                        | ⏳     |
-| Auto-update via Squirrel                                      | ⏳     |
-| Identity groups ("Work" / "Personal" containers)              | ⏳     |
-| Drag-tab-onto-identity to rebind                              | ⏳     |
-| Export / import an identity (cookie bundle)                   | ⏳     |
+| Identity rename / recolour                                    | ✅     |
+| Identity Group Tabs (clustered tab strip)                     | ✅     |
 | Build to `.dmg` / `.exe` via electron-builder                 | ✅     |
-| **Automation: scripted navigation + text input into target fields** | ⏳     |
+| Automation: coordinate-based record & replay                  | ✅     |
+| Full-text typing (300+ char prompts)                          | ✅     |
+| Script Gallery (save/edit/search/sort with metadata)          | ✅     |
+| Scheduling (one-time & recurring)                             | ✅     |
+| Multi-Run (different scripts per identity, parallel)          | ✅     |
+| Visual element picker                                         | ✅     |
+| Cosmetic polish (focus rings, transitions, terminal log)      | ✅     |
+
+## Version 5X-Beta (next)
+
+| Feature                                                       | Status |
+|---------------------------------------------------------------|--------|
+| Bookmarks (per-identity bookmark bar)                         | ⏳     |
+| Find-in-page (Ctrl+F / Cmd+F)                                | ⏳     |
+| Per-identity browsing history (searchable)                    | ⏳     |
+| Export / import identity (cookie + bookmark bundle)           | ⏳     |
+| Identity groups ("Work" / "Personal" collapsible folders)     | ⏳     |
+| Drag-tab-onto-identity to rebind                              | ⏳     |
+| Native menu bar (File / Edit / Window with shortcuts)         | ⏳     |
+| Identity-coloured tab borders                                 | ⏳     |
+| Auto-update via Squirrel                                      | ⏳     |
+| Script marketplace (share/import community scripts)           | ⏳     |
+| Conditional automation (if element exists → do X, else Y)    | ⏳     |
+| Screenshot diff (compare before/after automation runs)        | ⏳     |
 
 ## License
 
