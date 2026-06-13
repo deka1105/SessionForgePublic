@@ -13,7 +13,7 @@ journalism source compartmentalization, and more.
 
 Grab the latest installer for your platform:
 
-- **macOS** — [SessionForge-5.0.0-beta.1-x64.dmg](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-5.0.0-beta.1-x64.dmg) *(Intel)* · [SessionForge-5.0.0-beta.1-arm64.dmg](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-5.0.0-beta.1-arm64.dmg) *(Apple Silicon)*
+- **macOS** — [SessionForge-5.0.0-beta.1.dmg](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-5.0.0-beta.1.dmg) *(Intel)* · [SessionForge-5.0.0-beta.1-arm64.dmg](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-5.0.0-beta.1-arm64.dmg) *(Apple Silicon)*
 - **Windows** — [SessionForge.Setup.5.0.0-beta.1.exe](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge.Setup.5.0.0-beta.1.exe)
 - **Linux** — [SessionForge-5.0.0-beta.1.AppImage](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-5.0.0-beta.1.AppImage)
 
