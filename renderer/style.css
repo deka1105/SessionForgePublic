@@ -51,6 +51,8 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 #app.sidebar-collapsed .sess-export,
 #app.sidebar-collapsed .sess-edit,
 #app.sidebar-collapsed .sess-x,
+#app.sidebar-collapsed .sess-add,
+#app.sidebar-collapsed .tree-tab-open,
 #app.sidebar-collapsed .sidebar-actions,
 #app.sidebar-collapsed .btn-primary .full  { display: none; }
 #app.sidebar-collapsed .btn-primary .mini  { display: grid; place-items: center; font-size: 20px; line-height: 1; }
@@ -122,7 +124,7 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
    collapsed icon-rail enlarges the swatch enough for it to be visible. */
 .sess-favicon { display: none; }
 .sess-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sess-edit, .sess-x, .sess-export {
+.sess-edit, .sess-x, .sess-export, .sess-add {
   background: transparent; border: none; color: var(--muted);
   cursor: pointer; padding: 0 4px;
   opacity: 0; transition: opacity .15s, color .15s;
@@ -130,12 +132,15 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .sess-edit { font-size: 12px; }
 .sess-x    { font-size: 16px; }
 .sess-export { font-size: 12px; }
+.sess-add { font-size: 15px; }
 .sess-item:hover .sess-edit,
 .sess-item:hover .sess-x,
-.sess-item:hover .sess-export { opacity: 1; }
+.sess-item:hover .sess-export,
+.sess-item:hover .sess-add { opacity: 1; }
 .sess-edit:hover { color: var(--text); }
 .sess-x:hover    { color: var(--danger); }
 .sess-export:hover { color: var(--accent); }
+.sess-add:hover { color: var(--accent); }
 
 /* Identity tree structure */
 .tree-node { list-style: none; }
@@ -169,6 +174,15 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; colo
 .tree-tab:hover .tree-tab-close { opacity: 1; }
 .tree-tab-sched:hover { color: var(--accent); }
 .tree-tab-close:hover { color: var(--danger); }
+
+/* Empty-state row for an identity with no open tabs: always visible (no
+   hover-reveal) so the affordance is discoverable, dashed like the collapsed
+   "+ New Identity" tile, turning solid on hover. */
+.tree-tab-open {
+  border: 1px dashed var(--border);
+  margin-top: 2px;
+}
+.tree-tab-open:hover { border-style: solid; background: var(--bg-hover); color: var(--text); }
 
 .hint { color: var(--muted); font-size: 11px; margin-top: auto; padding-top: 14px; }
 

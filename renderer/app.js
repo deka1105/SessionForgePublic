@@ -117,6 +117,8 @@ function renderSidebar() {
       dot,
       el("span", { className: "sess-name", textContent: s.name }),
       tabCount,
+      el("button", { className: "sess-add", title: `New tab in "${s.name}"`, textContent: "+",
+                     onclick: e => { e.stopPropagation(); openTab(s.id); } }),
       el("button", { className: "sess-export", title: "Export identity", textContent: "↑",
                      onclick: e => { e.stopPropagation(); window.api.exportIdentity(s.id); } }),
       el("button", { className: "sess-edit", title: "Rename or recolour", textContent: "✎",
@@ -192,6 +194,18 @@ function renderSidebar() {
         tabList.append(tabItem);
       }
       li.append(tabList);
+    }
+
+    // Empty state: an identity with no open tabs still needs an obvious way
+    // to open one (e.g. after all its tabs were closed, or a fresh restore).
+    if (isExpanded && identityTabs.length === 0) {
+      const emptyList = el("ul", { className: "tree-tabs" });
+      const openRow = el("li", { className: "tree-tab tree-tab-open", title: `Open a new tab in "${s.name}"` },
+        el("span", { className: "tree-tab-title", textContent: "+ Open a tab" }),
+      );
+      openRow.onclick = () => openTab(s.id);
+      emptyList.append(openRow);
+      li.append(emptyList);
     }
 
     ul.append(li);
@@ -368,6 +382,7 @@ function activateTab(id) {
   }
   $("emptyState").hidden = state.tabs.length > 0;
   renderTabs();
+  renderSidebar();   // keep tree counts / active highlight / empty states fresh
   renderBookmarksBar();
   persistTabs();
 }
@@ -411,6 +426,7 @@ function closeTab(id) {
   if (state.activeTab) activateTab(state.activeTab);
   else { $("urlInput").value = ""; $("sessionChip").textContent = ""; $("emptyState").hidden = false; }
   renderTabs();
+  renderSidebar();
   persistTabs();
 }
 
