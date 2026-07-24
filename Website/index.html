@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SessionForge — Parallel sessions, one browser</title>
+<meta name="description" content="Stay logged into the same website as many different users at once. Every tab runs a real Chromium engine with its own isolated cookie jar. Free, open source, cross-platform." />
+<link rel="icon" type="image/png" href="assets/favicon-32.png" />
+
+<!-- Open Graph -->
+<meta property="og:title" content="SessionForge — Parallel sessions, one browser" />
+<meta property="og:description" content="One browser, many identities. Each tab keeps its own cookies, storage, and login — even on the exact same site." />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="assets/app-icon-512.png" />
+
+<!-- Analytics -->
+<script defer src="https://cloud.umami.is/script.js" data-website-id="652a4bb6-cd8b-4592-a032-5f307f1d6cc6"></script>
+
+<style>
+  :root{
+    --bg:#0b0d12; --bg-elev:#12161f; --bg-elev-2:#161b26;
+    --border:#232a38; --border-soft:#1b212d;
+    --text:#e7ecf3; --muted:#96a1b5; --muted-dim:#6b7688;
+    --accent:#6ea8ff; --accent-2:#4d8aff; --accent-deep:#0a4da2;
+    --sky:#7db8ff; --navy:#0d3a78;
+    --danger:#ff6b6b; --ok:#54d18c;
+    --radius:16px; --radius-sm:10px;
+    --maxw:1120px;
+    --shadow:0 24px 60px -20px rgba(0,0,0,.7);
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; font-family:var(--font); color:var(--text);
+    background:var(--bg); line-height:1.6; -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  a{color:var(--accent); text-decoration:none}
+  a:hover{color:var(--sky)}
+  h1,h2,h3{line-height:1.15; margin:0; letter-spacing:-.02em}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:0 24px}
+  .eyebrow{
+    display:inline-flex; align-items:center; gap:8px;
+    font-size:12px; font-weight:600; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--accent); background:rgba(110,168,255,.10);
+    border:1px solid rgba(110,168,255,.25); padding:6px 12px; border-radius:999px;
+  }
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px rgba(84,209,140,.15)}
+
+  /* ---------- background glow ---------- */
+  .glow{position:fixed; inset:0; z-index:-1; overflow:hidden; pointer-events:none}
+  .glow::before,.glow::after{content:""; position:absolute; border-radius:50%; filter:blur(90px); opacity:.5}
+  .glow::before{width:620px;height:620px; top:-220px; left:-120px;
+    background:radial-gradient(circle, rgba(77,138,255,.55), transparent 65%)}
+  .glow::after{width:560px;height:560px; top:120px; right:-160px;
+    background:radial-gradient(circle, rgba(125,184,255,.35), transparent 65%)}
+
+  /* ---------- nav ---------- */
+  nav{position:sticky; top:0; z-index:50; backdrop-filter:blur(12px);
+    background:rgba(11,13,18,.72); border-bottom:1px solid var(--border-soft)}
+  .nav-inner{display:flex; align-items:center; justify-content:space-between; height:64px}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:-.01em}
+  .brand img{width:30px;height:30px}
+  .brand b{color:#fff} .brand span{color:var(--muted)}
+  .nav-links{display:flex; align-items:center; gap:26px}
+  .nav-links a{color:var(--muted); font-size:14.5px; font-weight:500}
+  .nav-links a:hover{color:#fff}
+  .nav-cta{
+    background:var(--accent-2); color:#fff !important; padding:9px 16px; border-radius:10px;
+    font-weight:600; font-size:14px; transition:transform .15s, background .15s, box-shadow .15s;
+    box-shadow:0 8px 20px -8px rgba(77,138,255,.8)}
+  .nav-cta:hover{background:var(--accent); transform:translateY(-1px)}
+  @media (max-width:720px){ .nav-links a:not(.nav-cta){display:none} }
+
+  /* ---------- hero ---------- */
+  header.hero{padding:88px 0 40px; text-align:center}
+  .hero h1{font-size:clamp(40px, 7vw, 76px); font-weight:800; margin:22px 0 0}
+  .hero h1 .grad{
+    background:linear-gradient(120deg, var(--sky), var(--accent-2) 55%, #b98bff);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent}
+  .hero p.sub{font-size:clamp(17px,2.3vw,21px); color:var(--muted); max-width:620px; margin:20px auto 0}
+  .hero p.sub b{color:var(--text); font-weight:600}
+
+  .downloads{display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin:38px 0 14px}
+  .btn{
+    display:inline-flex; align-items:center; gap:10px; font-weight:600; font-size:15px;
+    padding:13px 22px; border-radius:12px; border:1px solid transparent; cursor:pointer;
+    transition:transform .15s, background .15s, border-color .15s, box-shadow .15s; color:#fff}
+  .btn svg{width:19px;height:19px;flex:0 0 auto}
+  .btn-primary{background:linear-gradient(135deg, var(--accent-2), var(--accent-deep));
+    box-shadow:0 14px 30px -12px rgba(77,138,255,.9)}
+  .btn-primary:hover{transform:translateY(-2px); box-shadow:0 18px 36px -12px rgba(77,138,255,1)}
+  .btn-ghost{background:var(--bg-elev); border-color:var(--border); color:var(--text)}
+  .btn-ghost:hover{background:var(--bg-elev-2); border-color:var(--accent-2); transform:translateY(-2px)}
+  .btn small{font-weight:500; color:var(--muted); font-size:12px}
+  .btn-primary small{color:rgba(255,255,255,.75)}
+  .meta{font-size:13px; color:var(--muted-dim); margin-top:8px}
+  .meta a{color:var(--muted)} .meta a:hover{color:var(--accent)}
+
+  /* ---------- window mock ---------- */
+  .stage{margin:56px auto 0; max-width:960px; position:relative}
+  .window{
+    background:var(--bg-elev); border:1px solid var(--border); border-radius:14px;
+    box-shadow:var(--shadow); overflow:hidden}
+  .titlebar{display:flex; align-items:center; gap:8px; padding:12px 14px;
+    background:var(--bg-elev-2); border-bottom:1px solid var(--border)}
+  .tl{width:12px;height:12px;border-radius:50%}
+  .tl.r{background:#ff5f57}.tl.y{background:#febc2e}.tl.g{background:#28c840}
+  .titlebar .addr{margin-left:12px; flex:1; height:26px; border-radius:7px; background:var(--bg);
+    border:1px solid var(--border); display:flex; align-items:center; padding:0 12px;
+    color:var(--muted-dim); font-size:12px; font-family:var(--mono)}
+  .app{display:grid; grid-template-columns:230px 1fr; min-height:340px}
+  .side{background:var(--bg-elev-2); border-right:1px solid var(--border); padding:16px 12px}
+  .side .lbl{font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted-dim); margin:2px 6px 10px}
+  .idn{display:flex; align-items:center; gap:9px; padding:8px 9px; border-radius:9px; font-size:13.5px; color:var(--text); margin-bottom:3px}
+  .idn:hover{background:var(--bg-hover, #1d2230)}
+  .idn.active{background:rgba(110,168,255,.12)}
+  .swatch{width:10px;height:10px;border-radius:50%; flex:0 0 auto}
+  .idn .ct{margin-left:auto; font-size:10px; color:var(--muted-dim); background:var(--bg); padding:1px 7px; border-radius:8px}
+  .addid{margin-top:8px; padding:8px 9px; border:1px dashed var(--border); border-radius:9px;
+    color:var(--muted); font-size:12.5px; text-align:center}
+  .content{padding:20px; display:flex; flex-direction:column; gap:12px}
+  .tabrow{display:flex; gap:8px; flex-wrap:wrap}
+  .tabchip{display:flex; align-items:center; gap:7px; font-size:12px; padding:6px 11px; border-radius:8px;
+    background:var(--bg-elev-2); border:1px solid var(--border); color:var(--muted)}
+  .tabchip.on{color:#fff; border-color:var(--accent-2); background:rgba(77,138,255,.14)}
+  .tabchip .swatch{width:8px;height:8px}
+  .surface{flex:1; border-radius:12px; border:1px solid var(--border);
+    background:
+      radial-gradient(700px 200px at 20% -10%, rgba(77,138,255,.16), transparent 60%),
+      var(--bg); display:flex; align-items:center; justify-content:center; text-align:center; padding:24px}
+  .surface .big{font-size:19px; font-weight:700; color:#fff}
+  .surface .small{font-size:13px; color:var(--muted); margin-top:6px}
+  @media (max-width:640px){ .app{grid-template-columns:1fr} .side{display:none} }
+  .float{position:absolute; z-index:2; background:var(--bg-elev); border:1px solid var(--border);
+    border-radius:12px; padding:10px 14px; font-size:12.5px; box-shadow:var(--shadow);
+    display:flex; align-items:center; gap:9px; animation:bob 5s ease-in-out infinite}
+  .float .k{font-family:var(--mono); background:var(--bg); border:1px solid var(--border);
+    border-radius:6px; padding:2px 7px; font-size:11px; color:var(--accent)}
+  .float.one{top:-18px; right:-6px}
+  .float.two{bottom:-18px; left:-6px; animation-delay:1.2s}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+  @media (max-width:720px){ .float{display:none} }
+
+  /* ---------- sections ---------- */
+  section{padding:84px 0}
+  .sec-head{text-align:center; max-width:640px; margin:0 auto 52px}
+  .sec-head h2{font-size:clamp(28px,4.4vw,42px); font-weight:800}
+  .sec-head p{color:var(--muted); font-size:17px; margin-top:14px}
+
+  .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:20px}
+  @media (max-width:900px){ .grid{grid-template-columns:1fr 1fr} }
+  @media (max-width:600px){ .grid{grid-template-columns:1fr} }
+  .card{background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--radius);
+    padding:26px; transition:transform .18s, border-color .18s, box-shadow .18s}
+  .card:hover{transform:translateY(-4px); border-color:var(--accent-2);
+    box-shadow:0 20px 44px -24px rgba(77,138,255,.6)}
+  .ic{width:44px;height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(135deg, rgba(77,138,255,.22), rgba(77,138,255,.06));
+    border:1px solid rgba(110,168,255,.25); margin-bottom:16px}
+  .ic svg{width:22px;height:22px;stroke:var(--accent)}
+  .card h3{font-size:18px; margin-bottom:8px}
+  .card p{color:var(--muted); font-size:14.5px; margin:0}
+
+  /* ---------- how it works ---------- */
+  .how{background:
+      linear-gradient(180deg, transparent, rgba(77,138,255,.04) 40%, transparent),
+      var(--bg)}
+  .how-grid{display:grid; grid-template-columns:1fr 1fr; gap:44px; align-items:center}
+  @media (max-width:860px){ .how-grid{grid-template-columns:1fr; gap:28px} }
+  .how ul{list-style:none; padding:0; margin:22px 0 0}
+  .how li{display:flex; gap:13px; padding:10px 0; color:var(--muted); font-size:15.5px}
+  .how li b{color:var(--text)}
+  .how li .chk{flex:0 0 auto; width:22px;height:22px; border-radius:50%;
+    background:rgba(84,209,140,.14); border:1px solid rgba(84,209,140,.4);
+    display:flex;align-items:center;justify-content:center; color:var(--ok); font-size:12px; margin-top:2px}
+  pre{margin:0; background:#0a0c11; border:1px solid var(--border); border-radius:14px;
+    padding:20px; overflow-x:auto; font-family:var(--mono); font-size:13px; line-height:1.7; color:#cdd6e5}
+  pre .c{color:var(--muted-dim)} pre .t{color:#7db8ff} pre .a{color:#b98bff} pre .s{color:#7fd99a}
+
+  /* ---------- use cases ---------- */
+  .chips{display:flex; flex-wrap:wrap; gap:12px; justify-content:center; max-width:860px; margin:0 auto}
+  .chip{background:var(--bg-elev); border:1px solid var(--border); border-radius:999px;
+    padding:11px 18px; font-size:14px; color:var(--muted); transition:border-color .15s, color .15s, transform .15s}
+  .chip:hover{border-color:var(--accent-2); color:#fff; transform:translateY(-2px)}
+  .chip b{color:var(--text); font-weight:600}
+
+  /* ---------- CTA ---------- */
+  .cta-band{background:
+      radial-gradient(600px 220px at 50% 0%, rgba(77,138,255,.22), transparent 70%),
+      var(--bg-elev); border:1px solid var(--border); border-radius:24px;
+    padding:56px 28px; text-align:center; box-shadow:var(--shadow)}
+  .cta-band h2{font-size:clamp(26px,4vw,38px); font-weight:800}
+  .cta-band p{color:var(--muted); font-size:17px; margin:14px auto 30px; max-width:520px}
+
+  /* ---------- footer ---------- */
+  footer{border-top:1px solid var(--border-soft); padding:40px 0; margin-top:40px}
+  .foot{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px}
+  .foot .brand span{color:var(--muted)}
+  .foot-links{display:flex; gap:22px; font-size:14px}
+  .foot-links a{color:var(--muted)} .foot-links a:hover{color:#fff}
+  .foot small{color:var(--muted-dim); font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="glow" aria-hidden="true"></div>
+
+<nav>
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top">
+      <img src="assets/logo-icon.png" alt="SessionForge logo" />
+      <span><b>Session</b><span>Forge</span></span>
+    </a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#use-cases">Use cases</a>
+      <a href="https://github.com/deka1105/SessionForgePublic" target="_blank" rel="noopener">GitHub</a>
+      <a class="nav-cta" href="#download">Download</a>
+    </div>
+  </div>
+</nav>
+
+<a id="top"></a>
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow"><span class="dot"></span> v5.0.0-beta.3 · Free &amp; open source</span>
+    <h1>Parallel sessions,<br><span class="grad">one browser.</span></h1>
+    <p class="sub">Stay logged into the <b>same website as many different users at once</b>. Every tab runs a real Chromium engine — but its cookies, storage, and login live in their own isolated bucket.</p>
+
+    <div id="download" class="downloads">
+      <a class="btn btn-primary" href="https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-5.0.0-beta.3-arm64.dmg">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 3c.1 1.2-.4 2.3-1.1 3.1-.8.8-2 1.5-3.1 1.4-.1-1.1.4-2.3 1.1-3 .8-.9 2.1-1.5 3.1-1.5zM20 17.2c-.5 1.2-.8 1.8-1.5 2.9-1 1.5-2.3 3.4-4 3.4-1.5 0-1.9-1-4-1-2 0-2.5 1-4 1-1.6 0-2.9-1.7-3.9-3.2-2.7-4.2-3-9.1-1.3-11.7C6.4 6.7 8 5.9 9.5 5.9c1.6 0 2.6 1 3.9 1 1.3 0 2-1 3.9-1 1.3 0 2.7.7 3.7 2-3.2 1.8-2.7 6.4.5 7.3z"/></svg>
+        <span>macOS <small>Apple Silicon · .dmg</small></span>
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-5.0.0-beta.3.dmg">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 3c.1 1.2-.4 2.3-1.1 3.1-.8.8-2 1.5-3.1 1.4-.1-1.1.4-2.3 1.1-3 .8-.9 2.1-1.5 3.1-1.5zM20 17.2c-.5 1.2-.8 1.8-1.5 2.9-1 1.5-2.3 3.4-4 3.4-1.5 0-1.9-1-4-1-2 0-2.5 1-4 1-1.6 0-2.9-1.7-3.9-3.2-2.7-4.2-3-9.1-1.3-11.7C6.4 6.7 8 5.9 9.5 5.9c1.6 0 2.6 1 3.9 1 1.3 0 2-1 3.9-1 1.3 0 2.7.7 3.7 2-3.2 1.8-2.7 6.4.5 7.3z"/></svg>
+        <span>macOS <small>Intel · .dmg</small></span>
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge.Setup.5.0.0-beta.3.exe">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5 10.5 4.4v7.1H3zM11.5 4.2 21 3v8.5h-9.5zM3 12.5h7.5v7.1L3 18.5zM11.5 12.5H21V21l-9.5-1.3z"/></svg>
+        <span>Windows <small>installer · .exe</small></span>
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-5.0.0-beta.3.AppImage">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2zm0 3.2a2.1 2.1 0 1 1 0 4.2 2.1 2.1 0 0 1 0-4.2zM7.6 16.9c.7-2 2.4-3.3 4.4-3.3s3.7 1.3 4.4 3.3a6.7 6.7 0 0 1-8.8 0z"/></svg>
+        <span>Linux <small>.AppImage</small></span>
+      </a>
+    </div>
+    <p class="meta">Unsigned beta — on first launch, right-click → Open (macOS) or “More info → Run anyway” (Windows).
+      <a href="https://github.com/deka1105/SessionForgePublic/releases" target="_blank" rel="noopener">All releases →</a></p>
+
+    <!-- window mock -->
+    <div class="stage">
+      <div class="float one"><span class="k">Ctrl</span>+<span class="k">Tab</span> to switch tabs</div>
+      <div class="float two">🔒 Isolated cookie jars</div>
+      <div class="window">
+        <div class="titlebar">
+          <span class="tl r"></span><span class="tl y"></span><span class="tl g"></span>
+          <span class="addr">claude.ai — signed in as two different people</span>
+        </div>
+        <div class="app">
+          <div class="side">
+            <div class="lbl">Identities</div>
+            <div class="idn"><span class="swatch" style="background:#8a94a6"></span> Default</div>
+            <div class="idn active"><span class="swatch" style="background:#6ea8ff"></span> Claude · Work <span class="ct">2</span></div>
+            <div class="idn"><span class="swatch" style="background:#ff86c8"></span> Claude · Personal <span class="ct">1</span></div>
+            <div class="idn"><span class="swatch" style="background:#54d18c"></span> ChatGPT · Acct 1 <span class="ct">1</span></div>
+            <div class="addid">+ New Identity</div>
+          </div>
+          <div class="content">
+            <div class="tabrow">
+              <span class="tabchip on"><span class="swatch" style="background:#6ea8ff"></span> Work · claude.ai</span>
+              <span class="tabchip"><span class="swatch" style="background:#ff86c8"></span> Personal · claude.ai</span>
+              <span class="tabchip"><span class="swatch" style="background:#54d18c"></span> Acct 1 · chatgpt.com</span>
+            </div>
+            <div class="surface">
+              <div>
+                <div class="big">Same site. Different logins. Zero cross-talk.</div>
+                <div class="small">Each tab is a fully independent Chromium session, bound to one identity.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Built for people who live in many accounts</h2>
+      <p>Not incognito windows. Not separate profiles you juggle. Real, persistent, side-by-side sessions.</p>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18"/></svg></div>
+        <h3>True session isolation</h3>
+        <p>Every tab gets its own cookie jar, localStorage, and IndexedDB via Chromium partitions. Two logins to the same site never see each other.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div>
+        <h3>Identity sidebar</h3>
+        <p>Organize tabs under colour-coded identities in a clean tree. Drag a tab onto another identity to instantly rebind its session.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <h3>Multi-Run &amp; scheduling</h3>
+        <p>Fire the same task across many identities at once, or schedule per-tab runs with a live countdown and full run history.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h.01M11 9h.01M7 13h6"/></svg></div>
+        <h3>Feels like a real browser</h3>
+        <p>Bookmarks, history, find-in-page, Ctrl+Tab switching, keyboard shortcuts, export/import identities — the essentials, done right.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 3l7 4v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V7z"/></svg></div>
+        <h3>Your data stays local</h3>
+        <p>No account, no cloud, no telemetry. Every partition lives on your own disk. Open source — read exactly what it does.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 12h16M12 4v16" stroke-linecap="round"/></svg></div>
+        <h3>Cross-platform</h3>
+        <p>Native builds for macOS (Intel &amp; Apple Silicon), Windows, and Linux. Built on Electron, so it's the same Chromium you already trust.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how" class="how">
+  <div class="wrap">
+    <div class="how-grid">
+      <div>
+        <span class="eyebrow">How it works</span>
+        <h2 style="font-size:clamp(26px,4vw,38px); margin-top:18px">One line of Chromium magic</h2>
+        <ul>
+          <li><span class="chk">✓</span><span>Electron's <b>&lt;webview&gt;</b> tag takes a <b>partition</b>. Same partition = shared storage.</span></li>
+          <li><span class="chk">✓</span><span>Different partitions get <b>completely separate cookie jars</b> — even loading the identical URL.</span></li>
+          <li><span class="chk">✓</span><span>SessionForge maps each identity to <b>persist:&lt;id&gt;</b>, so logins survive restarts.</span></li>
+          <li><span class="chk">✓</span><span>Storage is written per-partition under your app data folder. Delete an identity, delete its jar.</span></li>
+        </ul>
+      </div>
+      <div>
+<pre><span class="c">&lt;!-- Two logins to the same site, side by side --&gt;</span>
+<span class="t">&lt;webview</span> <span class="a">src</span>=<span class="s">"https://claude.ai"</span>
+         <span class="a">partition</span>=<span class="s">"persist:user1"</span><span class="t">&gt;&lt;/webview&gt;</span>
+
+<span class="t">&lt;webview</span> <span class="a">src</span>=<span class="s">"https://claude.ai"</span>
+         <span class="a">partition</span>=<span class="s">"persist:user2"</span><span class="t">&gt;&lt;/webview&gt;</span>
+
+<span class="c">// Both render claude.ai in parallel.
+// Two independent Chromium sessions.
+// Neither knows the other exists.</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="use-cases">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>25+ real situations this solves</h2>
+      <p>Anywhere you'd otherwise juggle incognito windows, separate browsers, or a second laptop.</p>
+    </div>
+    <div class="chips">
+      <span class="chip"><b>Agencies</b> — many brand social accounts</span>
+      <span class="chip"><b>Freelancers</b> — one tab per client tenant</span>
+      <span class="chip"><b>QA</b> — role-matrix testing in one window</span>
+      <span class="chip"><b>Dev</b> — cookie &amp; OAuth flow debugging</span>
+      <span class="chip"><b>Support</b> — agent + customer views at once</span>
+      <span class="chip"><b>SEO</b> — personalized vs neutral SERPs</span>
+      <span class="chip"><b>Sellers</b> — multiple marketplace accounts</span>
+      <span class="chip"><b>Families</b> — one identity per person</span>
+      <span class="chip"><b>Journalism</b> — source compartmentalization</span>
+      <span class="chip"><b>Privacy</b> — banking isolated from ads</span>
+      <span class="chip"><b>Pentest</b> — authorized multi-user sessions</span>
+      <span class="chip"><b>Personal + work</b> — Google / Microsoft</span>
+    </div>
+    <p style="text-align:center; margin-top:26px">
+      <a href="https://github.com/deka1105/SessionForgePublic/blob/main/useCases.md" target="_blank" rel="noopener">Read all 25 use cases →</a>
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="cta-band">
+      <img src="assets/logo-icon.png" alt="" width="64" height="64" style="margin-bottom:8px" />
+      <h2>Forge your first identity in 60 seconds</h2>
+      <p>Download, open, click <b>+ New Identity</b>, and log into the same site twice. That's the whole demo.</p>
+      <div class="downloads" style="margin-bottom:0">
+        <a class="btn btn-primary" href="#download">↑ Get SessionForge</a>
+        <a class="btn btn-ghost" href="https://github.com/deka1105/SessionForgePublic" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.36 1.09 2.94.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>
+          View source
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <a class="brand" href="#top"><img src="assets/logo-icon.png" alt="" /><span><b>Session</b><span>Forge</span></span></a>
+    <div class="foot-links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="https://github.com/deka1105/SessionForgePublic" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/deka1105/SessionForgePublic/releases" target="_blank" rel="noopener">Releases</a>
+    </div>
+    <small>Parallel sessions, one browser. · v5.0.0-beta.3 · MIT-licensed</small>
+  </div>
+</footer>
+
+</body>
+</html>
