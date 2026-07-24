@@ -342,6 +342,10 @@ function buildMenu() {
         { type: "separator" },
         { label: "Close Tab", accelerator: "CmdOrCtrl+W", click: () => sendToRenderer("menu:close-tab") },
         { type: "separator" },
+        // Ctrl+Tab on every platform (Cmd+Tab is the macOS app switcher), matching every browser.
+        { label: "Next Tab", accelerator: "Control+Tab", click: () => sendToRenderer("menu:next-tab") },
+        { label: "Previous Tab", accelerator: "Control+Shift+Tab", click: () => sendToRenderer("menu:prev-tab") },
+        { type: "separator" },
         ...(isMac ? [] : [{ role: "quit" }]),
       ],
     },

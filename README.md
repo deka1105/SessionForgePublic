@@ -13,9 +13,9 @@ journalism source compartmentalization, and more.
 
 Grab the latest installer for your platform:
 
-- **macOS** — [SessionForge-5.0.0-beta.2.dmg](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-5.0.0-beta.2.dmg) *(Intel)* · [SessionForge-5.0.0-beta.2-arm64.dmg](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-5.0.0-beta.2-arm64.dmg) *(Apple Silicon)*
-- **Windows** — [SessionForge.Setup.5.0.0-beta.2.exe](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge.Setup.5.0.0-beta.2.exe)
-- **Linux** — [SessionForge-5.0.0-beta.2.AppImage](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-5.0.0-beta.2.AppImage)
+- **macOS** — [SessionForge-5.0.0-beta.3.dmg](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-5.0.0-beta.3.dmg) *(Intel)* · [SessionForge-5.0.0-beta.3-arm64.dmg](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-5.0.0-beta.3-arm64.dmg) *(Apple Silicon)*
+- **Windows** — [SessionForge.Setup.5.0.0-beta.3.exe](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge.Setup.5.0.0-beta.3.exe)
+- **Linux** — [SessionForge-5.0.0-beta.3.AppImage](https://github.com/deka1105/SessionForgePublic/releases/latest/download/SessionForge-5.0.0-beta.3.AppImage)
 
 Builds are unsigned, so on first launch macOS Gatekeeper / Windows
 SmartScreen will warn — right-click → Open (mac) or "More info → Run

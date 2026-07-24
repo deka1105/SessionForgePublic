@@ -728,6 +728,23 @@ window.api.onMenu("menu:find", () => openFind());
 window.api.onMenu("menu:reload", () => state.tabs.find(t => t.id === state.activeTab)?.webview.reload());
 window.api.onMenu("menu:toggle-sidebar", () => $("sidebarToggle").click());
 
+// Ctrl+Tab / Ctrl+Shift+Tab — cycle through open tabs in the order they appear
+// in the strip (grouped by identity), wrapping around at the ends.
+function cycleTab(dir) {
+  const groups = new Map();
+  for (const t of state.tabs) {
+    if (!groups.has(t.sessionId)) groups.set(t.sessionId, []);
+    groups.get(t.sessionId).push(t);
+  }
+  const ordered = [...groups.values()].flat();
+  if (ordered.length < 2) return;
+  let idx = ordered.findIndex(t => t.id === state.activeTab);
+  if (idx < 0) idx = 0;
+  activateTab(ordered[(idx + dir + ordered.length) % ordered.length].id);
+}
+window.api.onMenu("menu:next-tab", () => cycleTab(1));
+window.api.onMenu("menu:prev-tab", () => cycleTab(-1));
+
 // ── find-in-page ────────────────────────────────────────────────────────
 function openFind() {
   $("findBar").hidden = false;
