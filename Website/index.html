@@ -202,6 +202,46 @@
   .foot-links{display:flex; gap:22px; font-size:14px}
   .foot-links a{color:var(--muted)} .foot-links a:hover{color:#fff}
   .foot small{color:var(--muted-dim); font-size:12.5px}
+
+  /* ---------- responsive / mobile ---------- */
+  @media (max-width:768px){
+    section{padding:60px 0}
+    .sec-head{margin-bottom:38px}
+    .stage{margin-top:40px}
+  }
+  @media (max-width:640px){
+    .wrap{padding:0 18px}
+    header.hero{padding:52px 0 20px}
+    .hero h1{font-size:clamp(32px,9vw,48px)}
+    .hero p.sub{font-size:16px; margin-top:16px}
+    /* stack downloads full-width for comfortable tap targets */
+    .downloads{flex-direction:column; align-items:stretch; gap:12px; margin:30px 0 12px}
+    .btn{justify-content:center; width:100%; padding:15px 20px}
+    .stage{margin-top:30px}
+    .window{border-radius:12px}
+    .titlebar .addr{font-size:11px}
+    .content{padding:16px}
+    .surface{padding:20px}
+    .surface .big{font-size:16px}
+    section{padding:52px 0}
+    .sec-head{margin-bottom:34px}
+    .sec-head h2{font-size:clamp(24px,6.8vw,32px)}
+    .sec-head p{font-size:15.5px; margin-top:12px}
+    .card{padding:22px}
+    .how li{font-size:15px}
+    pre{padding:16px; font-size:12px}
+    .cta-band{padding:40px 20px; border-radius:20px}
+    .foot{flex-direction:column; align-items:flex-start; gap:16px}
+  }
+  @media (max-width:400px){
+    .hero h1{font-size:29px}
+    .chip{font-size:13px; padding:9px 14px}
+  }
+  /* honour reduced-motion preference */
+  @media (prefers-reduced-motion:reduce){
+    .float{animation:none}
+    *{scroll-behavior:auto}
+  }
 </style>
 </head>
 <body>
