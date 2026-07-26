@@ -24,15 +24,15 @@
 <meta property="og:url" content="https://sessionforge.sdfolio.com/" />
 <meta property="og:site_name" content="SessionForge" />
 <meta property="og:locale" content="en_US" />
-<meta property="og:image" content="https://sessionforge.sdfolio.com/assets/app-icon-512.png" />
-<meta property="og:image:alt" content="SessionForge — stacked browser windows logo" />
+<meta property="og:image" content="https://sessionforge.sdfolio.com/assets/screenshot-app.png" />
+<meta property="og:image:alt" content="SessionForge showing the same site logged in under two identities side by side" />
 
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="SessionForge — Parallel sessions, one browser" />
 <meta name="twitter:description" content="Stay logged into the same website as many different users at once. Free & open source for macOS, Windows, and Linux." />
-<meta name="twitter:image" content="https://sessionforge.sdfolio.com/assets/app-icon-512.png" />
-<meta name="twitter:image:alt" content="SessionForge — stacked browser windows logo" />
+<meta name="twitter:image" content="https://sessionforge.sdfolio.com/assets/screenshot-app.png" />
+<meta name="twitter:image:alt" content="SessionForge showing the same site logged in under two identities side by side" />
 
 <!-- Structured data -->
 <script type="application/ld+json">
@@ -205,6 +205,7 @@
   .window{
     background:var(--bg-elev); border:1px solid var(--border); border-radius:14px;
     box-shadow:var(--shadow); overflow:hidden}
+  .window.shot img{display:block; width:100%; height:auto}
   .titlebar{display:flex; align-items:center; gap:8px; padding:12px 14px;
     background:var(--bg-elev-2); border-bottom:1px solid var(--border)}
   .tl{width:12px;height:12px;border-radius:50%}
@@ -442,34 +443,10 @@
     <div class="stage">
       <div class="float one"><span class="k">Ctrl</span>+<span class="k">Tab</span> to switch tabs</div>
       <div class="float two">🔒 Isolated cookie jars</div>
-      <div class="window">
-        <div class="titlebar">
-          <span class="tl r"></span><span class="tl y"></span><span class="tl g"></span>
-          <span class="addr">claude.ai — signed in as two different people</span>
-        </div>
-        <div class="app">
-          <div class="side">
-            <div class="lbl">Identities</div>
-            <div class="idn"><span class="swatch" style="background:#8a94a6"></span> Default</div>
-            <div class="idn active"><span class="swatch" style="background:#6ea8ff"></span> Claude · Work <span class="ct">2</span></div>
-            <div class="idn"><span class="swatch" style="background:#ff86c8"></span> Claude · Personal <span class="ct">1</span></div>
-            <div class="idn"><span class="swatch" style="background:#54d18c"></span> ChatGPT · Acct 1 <span class="ct">1</span></div>
-            <div class="addid">+ New Identity</div>
-          </div>
-          <div class="content">
-            <div class="tabrow">
-              <span class="tabchip on"><span class="swatch" style="background:#6ea8ff"></span> Work · claude.ai</span>
-              <span class="tabchip"><span class="swatch" style="background:#ff86c8"></span> Personal · claude.ai</span>
-              <span class="tabchip"><span class="swatch" style="background:#54d18c"></span> Acct 1 · chatgpt.com</span>
-            </div>
-            <div class="surface">
-              <div>
-                <div class="big">Same site. Different logins. Zero cross-talk.</div>
-                <div class="small">Each tab is a fully independent Chromium session, bound to one identity.</div>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="window shot">
+        <img src="assets/screenshot-app.png" width="1760" height="725"
+             alt="SessionForge with two identities — Work · Google and Personal · Google — each holding the same DuckDuckGo site open in its own tab, side by side in one window"
+             loading="eager" decoding="async" />
       </div>
     </div>
   </div>
@@ -566,7 +543,7 @@
       <span class="chip"><b>Personal + work</b> — Google / Microsoft</span>
     </div>
     <p style="text-align:center; margin-top:26px">
-      <a href="https://github.com/deka1105/SessionForgePublic/blob/main/useCases.md" target="_blank" rel="noopener">Read all 25 use cases →</a>
+      <a href="use-cases.html">Read all 25 use cases in detail →</a>
     </p>
   </div>
 </section>
