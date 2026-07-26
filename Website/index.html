@@ -6,15 +6,113 @@
 <meta name="color-scheme" content="dark" />
 <meta name="theme-color" content="#0b0d12" />
 <script>document.documentElement.className += " js";</script>
-<title>SessionForge — Parallel sessions, one browser</title>
-<meta name="description" content="Stay logged into the same website as many different users at once. Every tab runs a real Chromium engine with its own isolated cookie jar. Free, open source, cross-platform." />
-<link rel="icon" type="image/png" href="assets/favicon-32.png" />
+<title>SessionForge — Parallel sessions, one browser | Free multi-account browser</title>
+<meta name="description" content="SessionForge is a free, open-source browser that keeps you logged into the same website as many different users at once. Every tab runs a real Chromium engine with its own isolated cookie jar. macOS, Windows, and Linux." />
+<link rel="canonical" href="https://sessionforge.sdfolio.com/" />
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+<meta name="author" content="Shubham A. D." />
+<meta name="application-name" content="SessionForge" />
+<meta name="keywords" content="multi-account browser, session isolation, multiple logins same site, Chromium partitions, Electron browser, multi-login browser, open source browser" />
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+<link rel="apple-touch-icon" href="assets/app-icon-512.png" />
+<link rel="manifest" href="site.webmanifest" />
 
 <!-- Open Graph -->
 <meta property="og:title" content="SessionForge — Parallel sessions, one browser" />
-<meta property="og:description" content="One browser, many identities. Each tab keeps its own cookies, storage, and login — even on the exact same site." />
+<meta property="og:description" content="One browser, many identities. Each tab keeps its own cookies, storage, and login — even on the exact same site. Free & open source for macOS, Windows, and Linux." />
 <meta property="og:type" content="website" />
-<meta property="og:image" content="assets/app-icon-512.png" />
+<meta property="og:url" content="https://sessionforge.sdfolio.com/" />
+<meta property="og:site_name" content="SessionForge" />
+<meta property="og:locale" content="en_US" />
+<meta property="og:image" content="https://sessionforge.sdfolio.com/assets/app-icon-512.png" />
+<meta property="og:image:alt" content="SessionForge — stacked browser windows logo" />
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="SessionForge — Parallel sessions, one browser" />
+<meta name="twitter:description" content="Stay logged into the same website as many different users at once. Free & open source for macOS, Windows, and Linux." />
+<meta name="twitter:image" content="https://sessionforge.sdfolio.com/assets/app-icon-512.png" />
+<meta name="twitter:image:alt" content="SessionForge — stacked browser windows logo" />
+
+<!-- Structured data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://sessionforge.sdfolio.com/#org",
+      "name": "SessionForge",
+      "url": "https://sessionforge.sdfolio.com/",
+      "logo": "https://sessionforge.sdfolio.com/assets/app-icon-512.png",
+      "sameAs": ["https://github.com/deka1105/SessionForgePublic"]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://sessionforge.sdfolio.com/#website",
+      "url": "https://sessionforge.sdfolio.com/",
+      "name": "SessionForge",
+      "description": "A free, open-source browser for staying logged into the same website as many different users at once.",
+      "publisher": { "@id": "https://sessionforge.sdfolio.com/#org" },
+      "inLanguage": "en"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://sessionforge.sdfolio.com/#app",
+      "name": "SessionForge",
+      "applicationCategory": "BrowserApplication",
+      "operatingSystem": "macOS, Windows, Linux",
+      "softwareVersion": "5.0.0-beta.3",
+      "url": "https://sessionforge.sdfolio.com/",
+      "downloadUrl": "https://github.com/deka1105/SessionForgePublic/releases",
+      "softwareHelp": "https://github.com/deka1105/SessionForgePublic",
+      "description": "A custom browser that lets you stay logged into the same website as multiple different users at the same time. Every tab runs a real Chromium engine, but each tab's cookies, localStorage, and IndexedDB live in their own isolated bucket.",
+      "license": "https://github.com/deka1105/SessionForgePublic/blob/main/LICENSE",
+      "isAccessibleForFree": true,
+      "publisher": { "@id": "https://sessionforge.sdfolio.com/#org" },
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "featureList": [
+        "True session isolation per tab via Chromium partitions",
+        "Colour-coded identity sidebar with drag-to-rebind",
+        "Multi-Run and per-tab scheduling with run history",
+        "Bookmarks, history, find-in-page, Ctrl+Tab switching",
+        "Local-only storage with no account and no telemetry"
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://sessionforge.sdfolio.com/#faq",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Is this just incognito or Chrome profiles?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. Incognito forgets everything the moment you close it, and Chrome profiles open in separate windows you have to juggle. SessionForge keeps persistent, side-by-side sessions in one window — you can be logged into the same site as several different users at once, and they'll all still be there tomorrow." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is it safe to install? My OS shows a warning.",
+          "acceptedAnswer": { "@type": "Answer", "text": "The builds are unsigned (it's a free beta), so macOS Gatekeeper and Windows SmartScreen warn on first launch. On macOS, right-click the app then Open; on Windows, click More info then Run anyway. Prefer not to trust a binary? The full source is public — build it yourself." }
+        },
+        {
+          "@type": "Question",
+          "name": "Where is my data stored? Does it phone home?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Everything stays local. Each identity's cookies and storage live in their own Chromium partition under your app-data folder. No account, no cloud sync, no telemetry." }
+        },
+        {
+          "@type": "Question",
+          "name": "Which websites work?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Any of them. Each tab is a real Chromium engine via Electron's webview, so sites behave exactly as they do in Chrome — just with an isolated cookie jar per identity." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is it really free and open source?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes — MIT-licensed and free. Read the code, file issues, or fork it on GitHub." }
+        }
+      ]
+    }
+  ]
+}
+</script>
 
 <!-- Analytics -->
 <script defer src="https://cloud.umami.is/script.js" data-website-id="652a4bb6-cd8b-4592-a032-5f307f1d6cc6"></script>
