@@ -3,3 +3,14 @@ node_modules/
 dist/
 out/
 *.log
+
+# Auto-added by watcher
+.env/
+env/
+.venv/
+.mypy_cache/
+build/
+venv/
+.pytest_cache/
+__pycache__/
+.tox/
